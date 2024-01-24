@@ -6,6 +6,9 @@ purpose: basic operations with pandas library
 comments: For Combobox and Listbox, exportselection=False is needed. Without this, 
           using the combo will clear the Listbox, generating a new ListboxSelect
           event with no content (== error).
+          
+          Pyarrow will become a required dependency of pandas in the next major 
+          release of pandas (pandas 3.0)
 
 author: Russell Folks
 
@@ -119,10 +122,19 @@ data interaction functions
 def data_filter(win, dcolumn=None, criterion=None):
     """Display a filtered version of the original DataFrame."""
 
-    dfresult = data_1[data_1[dcolumn] == criterion]
-    win.delete('1.0', tk.END)
-    win.insert('1.0', dfresult)
-    win.tag_add('yellowbkg', '1.0', '1.end')
+    # test
+    dcolumn = ['gender', 'age']
+    criterion = ['M', '>60']
+    quote = '\"'
+    # end test
+
+    q_expression = dcolumn[0] + "==" + quote + criterion[0] + quote + ' & ' + dcolumn[1] + criterion[1]
+
+    print(f'q_expression: {q_expression}')
+    # dfresult = data_1.query(q_expression)
+    # win.delete('1.0', tk.END)
+    # win.insert('1.0', dfresult)
+    # win.tag_add('yellowbkg', '1.0', '1.end')
 
 
 def data_unfilter(win, df):
@@ -186,6 +198,20 @@ def scatter_plot(df: pd.DataFrame,
     plt.show()
 
 
+def add_row():
+    """Add a row of widgets for new filter criterion."""
+
+    pass
+
+
+def remove_row():
+    """Remove this row of widgets for a filter criterion."""
+
+    chk_filt_age.grid_remove()
+    age_crit_entry.grid_remove()
+    btn_add_crit_2.grid_remove()
+    
+
 root = tk.Tk()
 root.title = 'myocardial strain'
 
@@ -198,7 +224,7 @@ output_win.pack(padx=10, pady=10, fill='x', expand=True)
 
 
 # ---------- module scope variables & objects
-data_items = ["age", "TID", "stress EF", "rest EF"]
+data_items = ["gender", "age", "TID", "stress EF", "rest EF"]
 line_data_source = 'age'
 bar_data_source = 'TID'
 scatter_data_source = {'x': 'age',
@@ -214,7 +240,7 @@ output_win.insert('1.0', data_1)
 output_win.tag_add('cyanbkg', '1.0', '1.end')
 
 
-# ---------- data display
+# ---------- filter the data display
 filter_column = 'gender'
 filter_criterion = 'M'
 
@@ -223,28 +249,25 @@ filter_frame = ttk.Frame(root, border=2, relief='raised')
 filter_label = ttk.Label(filter_frame, text='show:')
 filter_label.pack(side='left')
 
-# btn_data_filter = ttk.Button(filter_frame,
-#                         text='show males',
-#                         command=lambda w=output_win, 
-#                                        col=filter_column,
-#                                        crit=filter_criterion: data_filter(w, col, crit))
-# btn_data_filter.pack(side='left', padx=10, pady=10)
+btn_data_filter = ttk.Button(filter_frame,
+                        text='select:',
+                        command=lambda w=output_win, 
+                                       col=filter_column,
+                                       crit=filter_criterion: data_filter(w, col, crit))
+btn_data_filter.pack(side='left', padx=5, pady=10)
 btn_data_unfilter = ttk.Button(filter_frame,
                         text='ALL',
                         width=4,
                         command=lambda w=output_win, d=data_1: data_unfilter(w, d))
-btn_data_unfilter.pack(side='left', padx=5, pady=10)
-
-
-
-
-checkb_spacing = {"padx": 5, "sticky": "w"}
+# btn_data_unfilter.pack(padx=5, pady=10)
 
 checkb_frame = tk.Frame(filter_frame, border=4, bg='yellow')
 checkb_frame.pack(side='left', padx=5, pady=5)
 
+
+
+# row of selection widgets # ----------
 filt_gender = tk.StringVar()
-filt_age = tk.StringVar()
 
 chk_filt_gender = ttk.Combobox(checkb_frame, height=3, width=7,
                    exportselection=False,
@@ -252,10 +275,8 @@ chk_filt_gender = ttk.Combobox(checkb_frame, height=3, width=7,
                    textvariable=filt_gender,
                    name='filt_1',
                    values=data_items)
-chk_filt_gender.current(1)
+chk_filt_gender.current(0)
 chk_filt_gender.bind('<<ComboboxSelected>>', select_filt_item)
-
-# chk_filt_age = tk.Checkbutton(checkb_frame, text="age", name="chk_filt_2",
 
 gender_criterion = 'M'
 gender_crit_entry = ttk.Entry(checkb_frame, width=7, textvariable=gender_criterion)
@@ -265,19 +286,39 @@ gender_crit_entry = ttk.Entry(checkb_frame, width=7, textvariable=gender_criteri
 btn_add_crit_1 = ttk.Button(checkb_frame,
                             text='+',
                             width=1,
-                            command=lambda d=1: add_criterion(d))
+                            command=remove_row)
+                            # command=lambda d=1: add_criterion(d))
+# ---------- END row
 
+filt_age = tk.StringVar()
 
+chk_filt_age = ttk.Combobox(checkb_frame, height=3, width=7,
+                   exportselection=False,
+                   state="readonly",
+                   textvariable=filt_age,
+                   name='filt_2',
+                   values=data_items)
+chk_filt_age.current(1)
+chk_filt_age.bind('<<ComboboxSelected>>', select_filt_item)
 
 age_criterion = ''
 age_crit_entry = ttk.Entry(checkb_frame, width=7, textvariable=age_criterion)
 
-chk_filt_gender.grid(cnf=checkb_spacing, row=0, column=0)
-gender_crit_entry.grid(row=0, column=1)
-btn_add_crit_1.grid(row=0, column=2)
+btn_add_crit_2 = ttk.Button(checkb_frame,
+                            text='+',
+                            width=1,
+                            command=lambda d=1: add_criterion(d))
 
-# chk_filt_age.grid(cnf=checkb_spacing, row=1, column=0)
-# age_crit_entry.grid(row=1, column=1)
+
+
+# chk_filt_gender.grid(cnf=checkb_spacing, row=0, column=0)
+chk_filt_gender.grid(row=0, column=0)
+gender_crit_entry.grid(row=0, column=1)
+btn_add_crit_1.grid(row=0, column=2, padx=5)
+
+chk_filt_age.grid(row=1, column=0)
+age_crit_entry.grid(row=1, column=1)
+btn_add_crit_2.grid(row=1, column=2, padx=5)
 
 
 

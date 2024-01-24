@@ -63,6 +63,23 @@ def basics(df):
     print(f'shape: {restEFequiv.shape}')
     print()
 
+    print('show all cols, filtered, v3')
+    print('gender = M and age > 60, using conditionals')
+    # method 1: one criterion at a time, using .loc
+    # gender_M = df.loc[lambda df: df['gender'] == 'M', :]
+    # gender_both = gender_M.loc[lambda gender_M: gender_M['age'] > 60]
+
+    # method 2: combine criteria, using .loc and lambda (callable)
+    # gender_both = df.loc[lambda df: (df['gender'] == 'M') & (df['age'] > 60), :]
+
+    # method 3: combine criteria using subscripts ('pure python')
+    # gender_both = df[(df['gender'] == 'M') & (df['age'] > 60)]
+
+    # method 4: combine criteria using query (expression)
+    gender_both = df.query('(gender == "M") & (age > 60)')
+    print(gender_both)
+    print()
+
     print('show 1 row')
     r3 = df.iloc[2]
     print(f'3rd row: \n{r3}')
