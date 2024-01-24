@@ -1,0 +1,11 @@
+# python virtual environment files
+.venv/
+
+# vscode info
+.vscode/
+
+# Jupyter
+notebook-01.ipynb
+
+# my text files
+notes.txt
