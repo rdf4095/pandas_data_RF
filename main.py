@@ -34,8 +34,8 @@ history:
 01-12-2024  Add unfilter() to display all data. Use radiobuttons to set scatter data,
             using module-scope variables.
 01-20-2024  Read Combobox widgets to determine data column plotted (line, bar).
-01-21-2024  Added for GitHub.
 01-22-2024  Begin UI for data filter options.
+01-23-2024  new GitHub repository.
 """
 # TODO: - Need global vars for data column(s) to use for line,bar plots.
 #       - Use Class for all settings?
