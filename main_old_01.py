@@ -39,11 +39,11 @@ history:
 01-20-2024  Read Combobox widgets to determine data column plotted (line, bar).
 01-22-2024  Begin UI for data filter options.
 01-23-2024  new GitHub repository.
-01-27-2024  Create all rows of the data filter in a loop.
-01-29-2024  Add validation function for filter criterion.
 """
 # TODO: - Need global vars for data column(s) to use for line,bar plots.
-#       - use tkinter.font to control multiple Labels, and the '+' character
+#       - Use Class for all settings?
+#       - add Title to plot windows
+#       - use tkinter.font to control multiple Labels, etc.
 #       - add category option (gender) to scatter plot UI
 
 import tkinter as tk
@@ -73,33 +73,14 @@ def read_checkb(var):
 
 def add_criterion(n):
     print(f'in add_criterion: {n}')
-    match n:
-        case 2:
-            # crit_row_2.grid(row=1, column=0)
-            pass
 
-
-def remove_row(f):
-    """Add or remove a row of widgets for a filter criterion."""
-    pass
-    # chk_filt_age.grid_remove()
-    # age_crit_entry.grid_remove()
-    # btn_add_crit_2.grid_remove()
-    
 
 def select_filt_item(ev):
     """Read Combobox to get item for data filter."""
 
     which_filt = ev.widget.winfo_name()
     val = ev.widget.get()
-    # print('last selected filter:')
-    # print(f'from {which_filt}, filt by: {val}')
-    # print('all filters:')
-    # for i in filt_vars:
-    #     print(i.get())
-    # print('all criteria:')
-    # for j in criterion_vars:
-    #     print(j.get())
+    print(f'from {which_filt}, filt by: {val}')
 
 
 def select_plot_item(ev):
@@ -141,86 +122,19 @@ data interaction functions
 def data_filter(win, dcolumn=None, criterion=None):
     """Display a filtered version of the original DataFrame."""
 
-    quote = ''
+    # test
+    dcolumn = ['gender', 'age']
+    criterion = ['M', '>60']
+    quote = '\"'
+    # end test
 
-    dcolumn = []
-    criteria = []
-    # operator = "=="
-    for i in range(len(data_items)):
-        if filt_vars[i].get() != '':
-            dcolumn.append(filt_vars[i].get())
-            criteria.append(criterion_vars[i].get())
-            # print(filt_vars[i].get())
-            # print(criterion_vars[i].get())
-    # s1 = "==34"
-    # s1.rfind()
+    q_expression = dcolumn[0] + "==" + quote + criterion[0] + quote + ' & ' + dcolumn[1] + criterion[1]
 
-    # q_expression = dcolumn[0] + "==" + quote + criteria[0] + quote + ' & ' + dcolumn[1] + criteria[1]
-
-    # q_expression = dcolumn[0] + "==" + quote + criteria[0] + quote
-
-    # TODO: have to loop through criteria and connect each one using ' & '
-    
-    validated_entry = validate_criterion(criteria[0])
-    if validated_entry['value'] != '':
-        filter_term = validate_term(validated_entry)
-        if not filter_term['value'].isnumeric():
-            quote = '\"'
-        q_expression = dcolumn[0] + filter_term['op'] + quote + filter_term['value'] + quote
-        # q_expression = dcolumn[0] + filter_term['op'] + filter_term['value']
-        print(f'q_expression: {q_expression}')
-    else:
-        print('No valid criterion.')
-
-    # q_expression = 'age>55'
     print(f'q_expression: {q_expression}')
-    dfresult = data_1.query(q_expression)
-    win.delete('1.0', tk.END)
-    win.insert('1.0', dfresult)
-    win.tag_add('yellowbkg', '1.0', '1.end')
-
-
-def validate_criterion(input):
-    char1 = input[0]
-    op = ''
-    op_end = -1
-    value = ''
-
-    criterion = {'op': '',
-                 'value': value}
-
-    if char1 in ['=', '>', '<']:
-        op_end = input.rfind('=')
-        if op_end > -1:
-            # op = input[:op_end + 1]
-            match op_end:
-                case 0:
-                    op = '=='
-                case 1:
-                    op = input[0:2]
-                case _:
-                    op = input[0:2]
-                    print(f'accepting nonstandard operator: {input[0:op_end + 1]} as: {op}')
-
-            value = input[op_end + 1:]
-        else:
-            op = input[0]
-            value = input[1:]
-    else:
-        print('value is text')
-        op = '=='
-        value = input[op_end + 1:]
-
-    print(f'in validate_criterion, value is: {value}')
-    criterion['op'] = op
-    criterion['value'] = value
-    return criterion
-    
-
-def validate_term(t):
-    # if t['value'].isnumeric():
-    #     t['value'] = float(t['value'])
-    return t
+    # dfresult = data_1.query(q_expression)
+    # win.delete('1.0', tk.END)
+    # win.insert('1.0', dfresult)
+    # win.tag_add('yellowbkg', '1.0', '1.end')
 
 
 def data_unfilter(win, df):
@@ -284,6 +198,21 @@ def scatter_plot(df: pd.DataFrame,
     plt.show()
 
 
+def add_row():
+    """Add a row of widgets for new filter criterion."""
+
+    pass
+
+
+def remove_row(f):
+    """Add or remove a row of widgets for a filter criterion."""
+
+
+    chk_filt_age.grid_remove()
+    age_crit_entry.grid_remove()
+    btn_add_crit_2.grid_remove()
+    
+
 root = tk.Tk()
 root.title = 'myocardial strain'
 
@@ -308,16 +237,6 @@ output_win.tag_configure("yellowbkg", background="yellow")
 # ---------- Read and display the dataset
 # ("1.0 lineend" also works for end-of-line)
 data_1 = pd.read_csv('data/strain_nml_sample.csv')
-
-# test and debug: characterize the dataset
-# print(data_1)
-# print(f'shape of data_1: {data_1.shape}')
-# print(f'columns in data_1: {data_1.shape[1]}')
-# print('types:')
-# for c in data_1.columns:
-#     # print(c)
-#     print(type(data_1[c]))
-
 output_win.insert('1.0', data_1)
 output_win.tag_add('cyanbkg', '1.0', '1.end')
 
@@ -333,9 +252,6 @@ filter_label.pack(side='left')
 
 btn_data_filter = ttk.Button(filter_frame,
                         text='select:',
-                        # command=lambda w=output_win, 
-                        #                col=filter_column,
-                        #                crit=filter_criterion: data_filter(w, col, crit))
                         command=lambda w=output_win, 
                                        col=filter_column,
                                        crit=filter_criterion: data_filter(w, col, crit))
@@ -350,46 +266,63 @@ checkb_frame = tk.Frame(filter_frame, border=4, bg='yellow')
 checkb_frame.pack(side='left', padx=5, pady=5)
 
 
-filt_rows = []
-filt_vars = []
-criterion_vars = []
-filt_cboxes = []
-filt_entries = []
-filt_buttons = []
 
-for r in range(len(data_items)):
-    rowframe = tk.Frame(checkb_frame)
-    var = tk.StringVar()
-    filt_cb = ttk.Combobox(rowframe, height=3, width=7,
-                           exportselection=False,
-                           state="readonly",
-                           name="item" + str(r),
-                           textvariable=var,
-                           values=data_items)
-    # filt_cb.current(0)
-    filt_cb.bind('<<ComboboxSelected>>', select_filt_item)
+# row of selection widgets # ----------
+# TODO: add a row frame, which can be added/removed by button-click,
+#       using grid() or grid_remove()
+filt_gender = tk.StringVar()
 
-    criterion = tk.StringVar()
-    
-    entry = ttk.Entry(rowframe, width=7, textvariable=criterion)
+chk_filt_gender = ttk.Combobox(checkb_frame, height=3, width=7,
+                   exportselection=False,
+                   state="readonly",
+                   textvariable=filt_gender,
+                   name='filt_1',
+                   values=data_items)
+chk_filt_gender.current(0)
+chk_filt_gender.bind('<<ComboboxSelected>>', select_filt_item)
 
-    button = ttk.Button(rowframe,
-                        text='+',
-                        width=1,
-                        command=lambda d=2: add_criterion(d))
+gender_criterion = 'M'
+gender_crit_entry = ttk.Entry(checkb_frame, width=7, textvariable=gender_criterion)
 
-    filt_rows.append(rowframe)
-    filt_vars.append(var)
-    filt_cboxes.append(filt_cb)
-    criterion_vars.append(criterion)
-    filt_entries.append(entry)
-    filt_buttons.append(button)
+# add style: font=('Arial', 14, 'bold'),
+# OR: use special character for '+'
+btn_add_crit_1 = ttk.Button(checkb_frame,
+                            text='+',
+                            width=1,
+                            command=lambda fxn='add': remove_row(fxn))
+                            # command=lambda d=1: add_criterion(d))
+# ---------- END row
 
-    filt_cb.grid(row=r, column=0)
-    entry.grid(row=r, column=1)
-    button.grid(row=r, column=2)
+filt_age = tk.StringVar()
 
-    rowframe.grid(row=r, column=0)
+chk_filt_age = ttk.Combobox(checkb_frame, height=3, width=7,
+                   exportselection=False,
+                   state="readonly",
+                   textvariable=filt_age,
+                   name='filt_2',
+                   values=data_items)
+chk_filt_age.current(0)
+chk_filt_age.bind('<<ComboboxSelected>>', select_filt_item)
+
+age_criterion = ''
+age_crit_entry = ttk.Entry(checkb_frame, width=7, textvariable=age_criterion)
+
+btn_add_crit_2 = ttk.Button(checkb_frame,
+                            text='+',
+                            width=1,
+                            command=lambda d=1: add_criterion(d))
+
+
+
+# chk_filt_gender.grid(cnf=checkb_spacing, row=0, column=0)
+chk_filt_gender.grid(row=0, column=0)
+gender_crit_entry.grid(row=0, column=1)
+btn_add_crit_1.grid(row=0, column=2, padx=5)
+
+chk_filt_age.grid(row=1, column=0)
+age_crit_entry.grid(row=1, column=1)
+# btn_add_crit_2.grid(row=1, column=2, padx=5)
+
 
 
 
