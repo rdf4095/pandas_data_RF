@@ -142,15 +142,6 @@ def scatter_select_y(y):
 data interaction functions
 --------------------------
 """
-def convert_column_names(df):
-    cols = df.columns
-    print(f'cols: {cols}')
-    cols = cols.map(lambda x: x.replace(' ', '_') if isinstance(x, str) else x)
-    df.columns = cols
-
-    return df
-
-
 def data_filter(win, dcolumn=None):
     """Display a filtered version of the original DataFrame."""
     # TODO: loop through criteria and connect each one using ' & '
@@ -168,23 +159,37 @@ def data_filter(win, dcolumn=None):
             dcolumn.append(filt_vars[i].get())
             criteria.append(criterion_vars[i].get())
 
-            validated_entry = validate_criterion(criteria[i])
-            if validated_entry['value'] != '':
-                filter_term = validate_term(validated_entry)
-                # test for numeric value.
-                # v2 test: float will pass
-                if not filter_term['value'].replace('.', '', 1).isnumeric():
-                    # assume a string value, and add quote marks
-                    quote = '\"'
-                q_expression = dcolumn[i] + filter_term['op'] + quote + filter_term['value'] + quote
-            else:
-                print('No valid criterion.')
-    print()
     print(f'filt columns: {dcolumn}')
     print(f'filt criteria: {criteria}')
-    print(f'q_expression string: {repr(q_expression)}')
 
-    # q_expression = q_expression.replace('rest EF', '\ ')
+    validated_entry = validate_criterion(criteria[0])
+    if validated_entry['value'] != '':
+        filter_term = validate_term(validated_entry)
+        # test for numeric value.
+        # v1 test: float won't pass
+        # if not filter_term['value'].isnumeric():
+
+        # v2 test: float will pass
+        if not filter_term['value'].replace('.', '', 1).isnumeric():
+            # assume a string value, and add quote marks
+            quote = '\"'
+
+        # v3 test: more comprehensive
+        """
+        from decimal import Decimal, InvalidOperation
+
+        def is_decimal(s):
+            try:
+                Decimal(s)
+                return True
+            except InvalidOperation:
+                return False
+        """
+        q_expression = dcolumn[0] + filter_term['op'] + quote + filter_term['value'] + quote
+    else:
+        print('No valid criterion.')
+
+    print(f'q_expression string: {repr(q_expression)}')
     dfresult = data_1.query(q_expression)
     win.delete('1.0', tk.END)
     win.insert('1.0', dfresult)
@@ -196,7 +201,7 @@ def validate_criterion(input):
     op = ''
     op_end = -1
     value = ''
-    # v = '1.02'
+    v = '1.02'
     
     print()    # debug
     criterion = {'op': '',
@@ -302,10 +307,6 @@ def scatter_plot(df: pd.DataFrame,
 root = tk.Tk()
 root.title = 'myocardial strain'
 
-# print(f'pandas library: {pd.__version__}')
-# print(f'pandas dependencies: {pd.show_versios()}')
-
-
 output_win = tk.Text(root, width=50, height=15,
                      background='beige',
                      foreground='black',
@@ -327,9 +328,6 @@ output_win.tag_configure("yellowbkg", background="yellow")
 # ---------- Read and display the dataset
 # ("1.0 lineend" also works for end-of-line)
 data_1 = pd.read_csv('data/strain_nml_sample.csv')
-# convert spaces and other python-unacceptable characters in column names 
-data_1 = convert_column_names(data_1)
-print(f'col names: {list(data_1.columns)}')
 
 # test and debug: characterize the dataset
 # print(data_1)
