@@ -41,10 +41,24 @@ history:
 01-23-2024  new GitHub repository.
 01-27-2024  Create all rows of the data filter in a loop.
 01-29-2024  Add validation function for filter criterion.
+02-06-2024  Rename some variables for consistency. verify both parts of filter are
+            nonempty. Move "all data" button to bottom of filter_ui frame.
 """
-# TODO: - Need global vars for data column(s) to use for line,bar plots.
-#       - use tkinter.font to control multiple Labels, and the '+' character
-#       - add category option (gender) to scatter plot UI
+"""
+TODO:
+    - Need global vars for data column(s) to use for line,bar plots.
+    - use tkinter.font to control multiple Labels, and the '+' character
+    - add category option (gender) to scatter plot UI
+    - separate data_filter() into 2 parts: 1) construct query, 2) apply filter,
+      since we will eventually apply filters programmatically, instead of
+      interactively.
+    - Construct a string to show the user all filters currently applied.
+    - data_filter now returns -1 if the filter failed.
+      try reading this by replacing the button's command attribute
+      with a bind().
+    - if user removes a filter crit., should we remove the displayed
+      value in the Combobox? Could try cb.set('')
+"""
 
 import tkinter as tk
 from tkinter import ttk
@@ -71,39 +85,45 @@ def read_checkb(var):
     print("\t", var.get())
 
 
-def add_criterion(n):
+def add_criterion_row(n):
+    """Add a row of widgets for a filter criterion."""
+
     print(f'in add_criterion: {n}')
     match n:
         case 2:
+            # display row 2
             # crit_row_2.grid(row=1, column=0)
+
+            # change row 1 symbol to '-'
+
             pass
 
 
-def remove_row(f):
-    """Add or remove a row of widgets for a filter criterion."""
-
-    # Also clear the Entry for the row, so data_filter() does not
-    # need to check it.
+def remove_criterion_row(f):
+    """Remove a row of widgets for a filter criterion."""
 
     pass
+    # grid_remove selected row
     # chk_filt_age.grid_remove()
     # age_crit_entry.grid_remove()
     # btn_add_crit_2.grid_remove()
+
+    # change selected row symbol to '+'
+
+    # clear Entry widget for selected row
+
     
 
-def select_filt_item(ev):
+# Not used. Is there a use for it?
+def select_filter_column(ev):
     """Read Combobox to get item for data filter."""
 
     which_filt = ev.widget.winfo_name()
     val = ev.widget.get()
-    # print('last selected filter:')
-    # print(f'from {which_filt}, filt by: {val}')
-    # print('all filters:')
-    # for i in filt_vars:
-    #     print(i.get())
-    # print('all criteria:')
-    # for j in criterion_vars:
-    #     print(j.get())
+    print('in select_filter_column:')
+    print(f'...from {which_filt}, filt by: {val}')
+    print(f'...widget parent: {ev.widget.winfo_parent()}')
+    print()
 
 
 def select_plot_item(ev):
@@ -142,7 +162,11 @@ def scatter_select_y(y):
 data interaction functions
 --------------------------
 """
-def convert_column_names(df):
+def clean_column_names(df):
+    """Convert single spaces in column names to underscore character.
+    
+    Future: remove other python-unacceptable characters.
+    """
     cols = df.columns
     print(f'cols: {cols}')
     cols = cols.map(lambda x: x.replace(' ', '_') if isinstance(x, str) else x)
@@ -151,7 +175,8 @@ def convert_column_names(df):
     return df
 
 
-def data_filter(win, dcolumn=None):
+# def data_filter(win, dcolumn=None):
+def data_filter(win):
     """Display a filtered version of the original DataFrame."""
     # TODO: loop through criteria and connect each one using ' & '
 
@@ -159,9 +184,16 @@ def data_filter(win, dcolumn=None):
     dcolumn = []
     criteria = []
     q_expression = ''
+    terms = []
 
     for i in range(len(data_items)):
-        if filt_vars[i].get() != '':
+        """Another method, instead of of query, is to use a series of 
+        terms like: df[col] > 55. This doesn't require cleaning col names.
+        """
+        current_term = ''
+        if filt_vars[i].get() != '' and criterion_vars[i].get() != '':
+
+
             # print('adding criterion:')
             # print(f'    {filt_vars[i].get()}')
             # print(f'    {criterion_vars[i].get()}')
@@ -170,21 +202,39 @@ def data_filter(win, dcolumn=None):
 
             validated_entry = validate_criterion(criteria[i])
             if validated_entry['value'] != '':
-                filter_term = validate_term(validated_entry)
+    
+                # ? need this
+                # filter_term = validate_term(validated_entry)
+    
                 # test for numeric value.
                 # v2 test: float will pass
-                if not filter_term['value'].replace('.', '', 1).isnumeric():
-                    # assume a string value, and add quote marks
+                # if not filter_term['value'].replace('.', '', 1).isnumeric():
+                if validated_entry['value'].replace('.', '', 1).isnumeric():
+                    print(' --- is numeric')
+                    quote = ''
+                else:
+                    # assume a string value
                     quote = '\"'
-                q_expression = dcolumn[i] + filter_term['op'] + quote + filter_term['value'] + quote
+                # q_expression = dcolumn[i] + filter_term['op'] + quote + filter_term['value'] + quote
+                current_term = dcolumn[i] + validated_entry['op'] + quote + validated_entry['value'] + quote
             else:
                 print('No valid criterion.')
+
+            terms.append(current_term)
+
+    if len(terms) == 0:
+        # no valid filter for this criterion row
+        return -1
+            
+    for t in terms:
+        q_expression += (t + ' & ')
+    q_expression = q_expression[:-3]
+
     print()
     print(f'filt columns: {dcolumn}')
     print(f'filt criteria: {criteria}')
     print(f'q_expression string: {repr(q_expression)}')
 
-    # q_expression = q_expression.replace('rest EF', '\ ')
     dfresult = data_1.query(q_expression)
     win.delete('1.0', tk.END)
     win.insert('1.0', dfresult)
@@ -196,7 +246,6 @@ def validate_criterion(input):
     op = ''
     op_end = -1
     value = ''
-    # v = '1.02'
     
     print()    # debug
     criterion = {'op': '',
@@ -220,26 +269,29 @@ def validate_criterion(input):
             op = input[0]
             value = input[1:]
     else:
-        print('value is text')
+        print('char1 `value is text')
         op = '=='
         value = input[op_end + 1:]
 
-    print(f'in validate_criterion, value is: {value}')
+    # print(f'...in validate_criterion, value is: {value}')
     criterion['op'] = op
     criterion['value'] = value
+
     return criterion
     
 
 def validate_term(t):
-    # if t['value'].isnumeric():
-    #     t['value'] = float(t['value'])
-    return t
+    """Future: Make a reasonable guess about ambiguous filter entry.
+     
+    Example: >=>>value. Handle typos, redunant operators, numerics in    
+    text columns, etc.
+    """
+    pass
+    # return t
 
 
 def data_unfilter(win, df):
     """Display the complete dataset."""
-
-    # ? clear filter criteria or leave them
 
     dfresult = df
     win.delete('1.0', tk.END)
@@ -305,7 +357,6 @@ root.title = 'myocardial strain'
 # print(f'pandas library: {pd.__version__}')
 # print(f'pandas dependencies: {pd.show_versios()}')
 
-
 output_win = tk.Text(root, width=50, height=15,
                      background='beige',
                      foreground='black',
@@ -314,7 +365,7 @@ output_win = tk.Text(root, width=50, height=15,
 output_win.pack(padx=10, pady=10, fill='x', expand=True)
 
 
-# ---------- module scope variables & objects
+# ---------- module scope objects
 data_items = ["gender", "age", "TID", "stress EF", "rest EF"]
 line_data_source = 'age'
 bar_data_source = 'TID'
@@ -327,13 +378,12 @@ output_win.tag_configure("yellowbkg", background="yellow")
 # ---------- Read and display the dataset
 # ("1.0 lineend" also works for end-of-line)
 data_1 = pd.read_csv('data/strain_nml_sample.csv')
-# convert spaces and other python-unacceptable characters in column names 
-data_1 = convert_column_names(data_1)
+
+data_1 = clean_column_names(data_1)
 print(f'col names: {list(data_1.columns)}')
 
 # test and debug: characterize the dataset
 # print(data_1)
-# print(f'shape of data_1: {data_1.shape}')
 # print(f'columns in data_1: {data_1.shape[1]}')
 # print('types:')
 # for c in data_1.columns:
@@ -344,31 +394,26 @@ output_win.insert('1.0', data_1)
 output_win.tag_add('cyanbkg', '1.0', '1.end')
 
 
-# ---------- filter the data display
-filter_column = 'gender'
-filter_criterion = 'M'
+# ---------- UI for data display filter
+# filter_column = ''
+# filter_criterion = ''
 
-filter_frame = ttk.Frame(root, border=2, relief='raised')
+filter_ui = ttk.Frame(root, border=2, relief='raised')
 
-filter_label = ttk.Label(filter_frame, text='show:')
+filter_frame = ttk.Frame(filter_ui, border=2, relief='groove')
+
+filter_label = ttk.Label(filter_frame, text='show data:')
 filter_label.pack(side='left')
 
-btn_data_filter = ttk.Button(filter_frame,
-                        text='select:',
-                        command=lambda w=output_win, 
-                                       col=filter_column: data_filter(w, col))
-btn_data_filter.pack(side='left', padx=5, pady=10)
-
-# put this below the entire filter frame (so it moves up/down)
-btn_data_unfilter = ttk.Button(filter_frame,
-                        text='ALL',
-                        width=4,
-                        command=lambda w=output_win, d=data_1: data_unfilter(w, d))
-# btn_data_unfilter.pack(side='left', padx=5, pady=10)
+btn_apply_filter = ttk.Button(filter_frame,
+                        text='filter:',
+                        command=lambda w=output_win: data_filter(w))
+                                    #    col=filter_column: data_filter(w, col))
+                                    #    : data_filter(w, col))
+btn_apply_filter.pack(side='left', padx=5, pady=10)
 
 filter_spec_frame = tk.Frame(filter_frame, border=4, bg='yellow')
 filter_spec_frame.pack(side='left', padx=10, pady=10)
-
 
 filt_rows = []
 filt_vars = []
@@ -387,16 +432,16 @@ for r in range(len(data_items)):
                            textvariable=var,
                            values=data_items)
     # filt_cb.current(0)
-    filt_cb.bind('<<ComboboxSelected>>', select_filt_item)
+    filt_cb.bind('<<ComboboxSelected>>', select_filter_column)
 
     criterion = tk.StringVar()
     
     entry = ttk.Entry(rowframe, width=7, textvariable=criterion)
-
+    
     button = ttk.Button(rowframe,
                         text='+',
                         width=1,
-                        command=lambda d=2: add_criterion(d))
+                        command=lambda d=2: add_criterion_row(d))
 
     filt_rows.append(rowframe)
     filt_cboxes.append(filt_cb)
@@ -412,9 +457,13 @@ for r in range(len(data_items)):
 
     rowframe.grid(row=r, column=0)
 
-
+btn_data_unfilter = ttk.Button(filter_ui,
+                        text='all data',
+                        command=lambda w=output_win, d=data_1: data_unfilter(w, d))
+btn_data_unfilter.pack(side='bottom')#, padx=5, pady=10)
 
 filter_frame.pack(padx=10, pady=10, fill='both')
+filter_ui.pack(padx=5, pady=5, fill='both')
 
 
 # ---------- Line plot selection
