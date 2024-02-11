@@ -86,32 +86,35 @@ def read_checkb(var):
 
 
 def add_criterion_row(n):
-    """Add a row of widgets for a filter criterion."""
+    """Add a row of widgets to input a filter criterion."""
 
-    print(f'in add_criterion: {n}')
-    match n:
-        case 2:
-            # display row 2
-            # crit_row_2.grid(row=1, column=0)
+    if n == len(filt_rows):
+        # no more rows
+        return
 
-            # change row 1 symbol to '-'
+    filt_rows[n].grid(row=n, column=0)
+    filt_buttons[n - 1].configure(text = '-')
 
-            pass
+    if n == len(filt_rows) - 1:
+        # this is the last row
+        filt_buttons[n].configure(text = '-')
+
+    # change callback fxn to remove the row...
+    filt_buttons[n - 1].configure(command=lambda d=n - 1: remove_criterion_row(d))
 
 
-def remove_criterion_row(f):
+def remove_criterion_row(n):
     """Remove a row of widgets for a filter criterion."""
-
-    pass
-    # grid_remove selected row
-    # chk_filt_age.grid_remove()
-    # age_crit_entry.grid_remove()
-    # btn_add_crit_2.grid_remove()
+    print(f'in remove_criterion_row {n}')
+    # filt_rows[n].grid_remove()
 
     # change selected row symbol to '+'
+    filt_buttons[n].configure(text = '+')
 
     # clear Entry widget for selected row
+    filt_entries[n].delete(0, tk.END)
 
+    # reset combobox to empty
     
 
 # Not used. Is there a use for it?
@@ -168,7 +171,7 @@ def clean_column_names(df):
     Future: remove other python-unacceptable characters.
     """
     cols = df.columns
-    print(f'cols: {cols}')
+    # print(f'cols: {cols}')
     cols = cols.map(lambda x: x.replace(' ', '_') if isinstance(x, str) else x)
     df.columns = cols
 
@@ -193,10 +196,6 @@ def data_filter(win):
         current_term = ''
         if filt_vars[i].get() != '' and criterion_vars[i].get() != '':
 
-
-            # print('adding criterion:')
-            # print(f'    {filt_vars[i].get()}')
-            # print(f'    {criterion_vars[i].get()}')
             dcolumn.append(filt_vars[i].get())
             criteria.append(criterion_vars[i].get())
 
@@ -320,7 +319,7 @@ def bar_plot(df: pd.DataFrame, col: tk.StringVar):
 
 def scatter_plot(df: pd.DataFrame, 
                  source: object,
-                 category: str = None,
+                 category: str = '',
                  catlist: list = []) -> None:
     """Create scatter plot for input df.
     
@@ -346,6 +345,7 @@ def scatter_plot(df: pd.DataFrame,
             plot_data = df2[df2[category].isin(catlist)]
     else:
         plot_data = df2
+        category = None
 
     create_plot(plot_data, category)
     plt.show()
@@ -380,7 +380,7 @@ output_win.tag_configure("yellowbkg", background="yellow")
 data_1 = pd.read_csv('data/strain_nml_sample.csv')
 
 data_1 = clean_column_names(data_1)
-print(f'col names: {list(data_1.columns)}')
+# print(f'col names: {list(data_1.columns)}')
 
 # test and debug: characterize the dataset
 # print(data_1)
@@ -437,12 +437,12 @@ for r in range(len(data_items)):
     criterion = tk.StringVar()
     
     entry = ttk.Entry(rowframe, width=7, textvariable=criterion)
-    
+
     button = ttk.Button(rowframe,
                         text='+',
                         width=1,
-                        command=lambda d=2: add_criterion_row(d))
-
+                        command=lambda d=r + 1: add_criterion_row(d))
+    
     filt_rows.append(rowframe)
     filt_cboxes.append(filt_cb)
     filt_entries.append(entry)
@@ -455,7 +455,10 @@ for r in range(len(data_items)):
     entry.grid(row=r, column=1)
     button.grid(row=r, column=2)
 
-    rowframe.grid(row=r, column=0)
+    # rowframe.grid(row=r, column=0)
+
+# display the first row
+filt_rows[0].grid(row=0, column=0)
 
 btn_data_unfilter = ttk.Button(filter_ui,
                         text='all data',
@@ -518,19 +521,46 @@ frame_cb2.pack(padx=5, fill='both')
 frame_barplot_ui.pack(padx=5, fill='x')
 
 # ---------- Scatter plot selection
-frame_scatterplot_ui = ttk.Frame(root, border=2, relief='raised')
+scatter_plot_ui = ttk.Frame(root, border=2, relief='raised')
 
-btn_scatter_plot = ttk.Button(frame_scatterplot_ui,
+scatter_basic = ttk.Frame(scatter_plot_ui, border=2, relief='groove')
+# need to grid these child widgets:
+btn_scatter_plot = ttk.Button(scatter_basic,
                   text='scatter plot',
                   command=lambda df=data_1: scatter_plot(df,
                                                          source=scatter_data_source,
-                                                         category='gender',
-                                                         catlist=['M', 'F'])
+                                                         category='',
+                                                         )
                   )
-btn_scatter_plot.pack(side='left', padx=10)
+                #   command=lambda df=data_1: scatter_plot(df,
+                #                                          source=scatter_data_source,
+                #                                          category='gender',
+                #                                          catlist=['M', 'F'])
+                #   )
+
+do_category = tk.StringVar()
+do_category_cb = ttk.Checkbutton(scatter_basic,
+                                 width=15,
+                                 textvariable=do_category,
+                                 text='Use category')
+
+category_label = ttk.Label(scatter_basic, text='Category:')
+category_label.pack(side='top')
+
+category_list = ['gender']
+catlist_var = tk.StringVar(value=category_list)
+category_lb= tk.Listbox(scatter_basic, height=1, width=10, listvariable=catlist_var)
+
+# btn_scatter_plot.pack(side='top', padx=10)
+# do_category_cb.pack(side='top')
+# category_lb.pack(side='top')
+# scatter_basic.pack(side='left')
+
+
+
 
 # Radio buttons ----------
-radiob_xframe = tk.Frame(frame_scatterplot_ui,
+radiob_xframe = tk.Frame(scatter_plot_ui,
                          border=4,
                          name='scatter_x')
 radiob_xframe.pack(padx=5, pady=5)
@@ -543,7 +573,7 @@ label_x.pack(fill='x', pady=5)
 
 xplot = tk.StringVar(radiob_xframe, 'age')
 
-radiob_yframe = tk.Frame(frame_scatterplot_ui,
+radiob_yframe = tk.Frame(scatter_plot_ui,
                          border=4,
                          name='scatter_y')
 radiob_yframe.pack(padx=5, pady=5)
@@ -573,7 +603,7 @@ radiob_xframe.pack(side='left', pady=10)
 radiob_yframe.pack(side='left', pady=10)
 # ---------- END Radio buttons
 
-frame_scatterplot_ui.pack(padx=5, fill='x')
+scatter_plot_ui.pack(padx=5, fill='x')
 
 
 btnq = ttk.Button(root, text='Quit', command=root.destroy)
