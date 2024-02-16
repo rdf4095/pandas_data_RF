@@ -105,17 +105,25 @@ def add_criterion_row(n):
 
 def remove_criterion_row(n):
     """Remove a row of widgets for a filter criterion."""
-    print(f'in remove_criterion_row {n}')
-    # filt_rows[n].grid_remove()
+    # if the user adds a row and skips entering anything in it,
+    # the app will lose track of which rows should have '-' and '+'
+    # (all will have '-')
 
-    # change selected row symbol to '+'
     filt_buttons[n].configure(text = '+')
 
-    # clear Entry widget for selected row
     filt_entries[n].delete(0, tk.END)
 
-    # reset combobox to empty
+    filt_cboxes[n].set('')
     
+    filt_rows[n].grid_remove()
+
+    # Re-filter by the remaining criteria. Note: this will apply
+    # newly-entered filters if they haven't beep applied already.
+    # This is probably better, incase the user forgets to click the
+    # 'filter' button and thereby loses track of which filters are
+    # currently used.
+    data_filter(output_win)
+
 
 # Not used. Is there a use for it?
 def select_filter_column(ev):
@@ -198,8 +206,14 @@ def data_filter(win):
 
             dcolumn.append(filt_vars[i].get())
             criteria.append(criterion_vars[i].get())
-
-            validated_entry = validate_criterion(criteria[i])
+            print(f'i is: {i}')
+            print(f'...filt: {filt_vars[i].get()}, criterion: {criterion_vars[i].get()}')
+            print()
+            print(f'...criteria list: {criteria}')
+            print()
+            current_criterion = len(criteria) - 1
+            # validated_entry = validate_criterion(criteria[i])
+            validated_entry = validate_criterion(criteria[current_criterion])
             if validated_entry['value'] != '':
     
                 # ? need this
@@ -215,7 +229,9 @@ def data_filter(win):
                     # assume a string value
                     quote = '\"'
                 # q_expression = dcolumn[i] + filter_term['op'] + quote + filter_term['value'] + quote
-                current_term = dcolumn[i] + validated_entry['op'] + quote + validated_entry['value'] + quote
+                    
+                # current_term = dcolumn[i] + validated_entry['op'] + quote + validated_entry['value'] + quote
+                current_term = dcolumn[current_criterion] + validated_entry['op'] + quote + validated_entry['value'] + quote
             else:
                 print('No valid criterion.')
 
@@ -353,6 +369,13 @@ def scatter_plot(df: pd.DataFrame,
 
 root = tk.Tk()
 root.title = 'myocardial strain'
+
+# Styles are not currently used.
+# Also: there is a mixture of tk and ttk widgets. We should try to be
+# consistent, whatever that might mean.
+# style = ttk.Style()
+# style.configure('MyCheckbutton.TCheckbutton', foreground='black')
+
 
 # print(f'pandas library: {pd.__version__}')
 # print(f'pandas dependencies: {pd.show_versios()}')
@@ -525,7 +548,7 @@ scatter_plot_ui = ttk.Frame(root, border=2, relief='raised')
 
 scatter_basic = ttk.Frame(scatter_plot_ui, border=2, relief='groove')
 # need to grid these child widgets:
-btn_scatter_plot = ttk.Button(scatter_basic,
+btn_scatter_plot = ttk.Button(scatter_plot_ui,
                   text='scatter plot',
                   command=lambda df=data_1: scatter_plot(df,
                                                          source=scatter_data_source,
@@ -540,21 +563,29 @@ btn_scatter_plot = ttk.Button(scatter_basic,
 
 do_category = tk.StringVar()
 do_category_cb = ttk.Checkbutton(scatter_basic,
+                                 text='Use category:',
                                  width=15,
-                                 textvariable=do_category,
-                                 text='Use category')
+                                 variable=do_category)#,
+                                #  style='MyCheckbutton.TCheckbutton')
 
-category_label = ttk.Label(scatter_basic, text='Category:')
-category_label.pack(side='top')
+# category_label = ttk.Label(scatter_basic, text='Category:')
+# category_label.pack(side='top')
 
 category_list = ['gender']
 catlist_var = tk.StringVar(value=category_list)
 category_lb= tk.Listbox(scatter_basic, height=1, width=10, listvariable=catlist_var)
 
-# btn_scatter_plot.pack(side='top', padx=10)
+btn_scatter_plot.pack(side='left', padx=10)
 # do_category_cb.pack(side='top')
 # category_lb.pack(side='top')
 # scatter_basic.pack(side='left')
+
+# btn_scatter_plot.grid(row=0, column=0, padx=5, pady=10, sticky='w')
+do_category_cb.grid(row=1, column=0, padx=5, pady=10, sticky='w')
+# category_label.grid(row=2, column=0, padx=5, pady=10, sticky='w')
+category_lb.grid(row=3, column=0, padx=5, pady=10, sticky='w')
+
+scatter_basic.pack(side='left')
 
 
 
