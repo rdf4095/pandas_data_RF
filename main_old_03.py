@@ -1,5 +1,5 @@
 """
-program: main.py
+program: main_old_03.py
 
 purpose: basic operations with pandas library
 
@@ -43,20 +43,23 @@ history:
 01-29-2024  Add validation function for filter criterion.
 02-06-2024  Rename some variables for consistency. verify both parts of filter are
             nonempty. Move "all data" button to bottom of filter_ui frame.
-02-16-2024  Begin changing the plotting UI to grid geometry.
-02-17-2024  Remove commented .pack calls, and unnecessary variables.
+02-16-2024  Before changing the entire plotting UI to grid, with embedded pack
+            for the scatterplot radio buttons.
 """
 """
 TODO:
     - Need global vars for data column(s) to use for line,bar plots.
     - use tkinter.font to control multiple Labels, and the '+' character
+    - add category option (gender) to scatter plot UI
     - separate data_filter() into 2 parts: 1) construct query, 2) apply filter,
       since we will eventually apply filters programmatically, instead of
       interactively.
-    - data_filter now returns -1 if the filter failed. Try
-      reading this by replacing the button's command attribute
+    - Construct a string to show the user all filters currently applied.
+    - data_filter now returns -1 if the filter failed.
+      try reading this by replacing the button's command attribute
       with a bind().
-    - There is a mixture of tk and ttk widgets. ? Try for consistency.
+    - if user removes a filter crit., should we remove the displayed
+      value in the Combobox? Could try cb.set('')
 """
 
 import tkinter as tk
@@ -80,14 +83,8 @@ def attend():
     print("combobox activated...")
 
 
-# def read_checkb(var):
-#     print("\t", var.get())
-
-
-def set_use_category():
-    print(f'set_use_category: {do_category.get()}')
-
-
+def read_checkb(var):
+    print("\t", var.get())
 
 
 def add_criterion_row(n):
@@ -109,11 +106,7 @@ def add_criterion_row(n):
 
 
 def remove_criterion_row(n):
-    """Remove a row of widgets for a filter criterion.
-    
-       Data is automatically re-filtered by the remaining criteria.
-    """
-    # TODO:
+    """Remove a row of widgets for a filter criterion."""
     # if the user adds a row and skips entering anything in it,
     # the app will lose track of which rows should have '-' and '+'
     # (all will have '-')
@@ -126,6 +119,11 @@ def remove_criterion_row(n):
     
     filt_rows[n].grid_remove()
 
+    # Re-filter by the remaining criteria. Note: this will apply
+    # newly-entered filters if they haven't beep applied already.
+    # This is probably better, incase the user forgets to click the
+    # 'filter' button and thereby loses track of which filters are
+    # currently used.
     data_filter(output_win)
 
 
@@ -193,12 +191,13 @@ def clean_column_names(df):
 # def data_filter(win, dcolumn=None):
 def data_filter(win):
     """Display a filtered version of the original DataFrame."""
+    # TODO: loop through criteria and connect each one using ' & '
 
+    quote = ''
     dcolumn = []
     criteria = []
-    terms = []
-    quote = ''
     q_expression = ''
+    terms = []
 
     for i in range(len(data_items)):
         """Another method, instead of of query, is to use a series of 
@@ -209,13 +208,11 @@ def data_filter(win):
 
             dcolumn.append(filt_vars[i].get())
             criteria.append(criterion_vars[i].get())
-
             print(f'i is: {i}')
             print(f'...filt: {filt_vars[i].get()}, criterion: {criterion_vars[i].get()}')
             print()
             print(f'...criteria list: {criteria}')
             print()
-
             current_criterion = len(criteria) - 1
             # validated_entry = validate_criterion(criteria[i])
             validated_entry = validate_criterion(criteria[current_criterion])
@@ -226,7 +223,9 @@ def data_filter(win):
     
                 # test for numeric value.
                 # v2 test: float will pass
+                # if not filter_term['value'].replace('.', '', 1).isnumeric():
                 if validated_entry['value'].replace('.', '', 1).isnumeric():
+                    print(' --- is numeric')
                     quote = ''
                 else:
                     # assume a string value
@@ -301,7 +300,7 @@ def validate_criterion(input):
 def validate_term(t):
     """Future: Make a reasonable guess about ambiguous filter entry.
      
-    Example: >=>>value. Handle typos, redundant operators, numerics in    
+    Example: >=>>value. Handle typos, redunant operators, numerics in    
     text columns, etc.
     """
     pass
@@ -347,9 +346,6 @@ def scatter_plot(df: pd.DataFrame,
     df2 = pd.DataFrame(df)
     plot_data = None
 
-    # category = 'gender'
-    # catlist = ['M', 'F']
-
     def create_plot(data, cat):
         data.plot.scatter(x=source['x'],
                           y=source['y'], 
@@ -377,12 +373,14 @@ root = tk.Tk()
 root.title = 'myocardial strain'
 
 # Styles are not currently used.
+# Also: there is a mixture of tk and ttk widgets. We should try to be
+# consistent, whatever that might mean.
 # style = ttk.Style()
 # style.configure('MyCheckbutton.TCheckbutton', foreground='black')
 
 
 # print(f'pandas library: {pd.__version__}')
-# print(f'pandas dependencies: {pd.show_versions()}')
+# print(f'pandas dependencies: {pd.show_versios()}')
 
 output_win = tk.Text(root, width=50, height=15,
                      background='beige',
@@ -401,21 +399,27 @@ scatter_data_source = {'x': 'age',
 output_win.tag_configure("cyanbkg", background="cyan")
 output_win.tag_configure("yellowbkg", background="yellow")
 
-# for scatter plot
-use_category = False
-
 
 # ---------- Read and display the dataset
 # ("1.0 lineend" also works for end-of-line)
 data_1 = pd.read_csv('data/strain_nml_sample.csv')
 
 data_1 = clean_column_names(data_1)
+# print(f'col names: {list(data_1.columns)}')
+
+# test and debug: characterize the dataset
+# print(data_1)
+# print(f'columns in data_1: {data_1.shape[1]}')
+# print('types:')
+# for c in data_1.columns:
+#     # print(c)
+#     print(type(data_1[c]))
 
 output_win.insert('1.0', data_1)
 output_win.tag_add('cyanbkg', '1.0', '1.end')
 
 
-# ---------- UI for filtered data display
+# ---------- UI for data display filter
 # filter_column = ''
 # filter_criterion = ''
 
@@ -452,10 +456,11 @@ for r in range(len(data_items)):
                            name="item" + str(r),
                            textvariable=var,
                            values=data_items)
-
+    # filt_cb.current(0)
     filt_cb.bind('<<ComboboxSelected>>', select_filter_column)
 
-    criterion = tk.StringVar()    
+    criterion = tk.StringVar()
+    
     entry = ttk.Entry(rowframe, width=7, textvariable=criterion)
 
     button = ttk.Button(rowframe,
@@ -475,29 +480,29 @@ for r in range(len(data_items)):
     entry.grid(row=r, column=1)
     button.grid(row=r, column=2)
 
+    # rowframe.grid(row=r, column=0)
+
+# display the first row
 filt_rows[0].grid(row=0, column=0)
 
 btn_data_unfilter = ttk.Button(filter_ui,
                         text='all data',
                         command=lambda w=output_win, d=data_1: data_unfilter(w, d))
-btn_data_unfilter.pack(side='bottom', pady=10)
+btn_data_unfilter.pack(side='bottom')#, padx=5, pady=10)
 
 filter_frame.pack(padx=10, pady=10, fill='both')
 filter_ui.pack(padx=5, pady=5, fill='both')
 
 
-# plotting UI
-# ===========
-plotting_ui = ttk.Frame(root, border=4)
-
 # ---------- Line plot selection
 line_data = tk.StringVar(value='age')
-
-btn_line_plot = ttk.Button(plotting_ui,
+frame_lineplot_ui = ttk.Frame(root, border=4)
+btn_line_plot = ttk.Button(frame_lineplot_ui,
                   text='Line plot',
                   command=lambda df=data_1, c=line_data: line_plot(df, col=c))
+btn_line_plot.pack(side='left', padx=10)
 
-frame_cb1 = ttk.Frame(plotting_ui, border=4)
+frame_cb1 = ttk.Frame(frame_lineplot_ui, border=4)
 cb1_label = ttk.Label(frame_cb1, text="data: ",
                 style="MyLabel.TLabel")
 cb1 = ttk.Combobox(frame_cb1, height=3, width=10,
@@ -506,21 +511,24 @@ cb1 = ttk.Combobox(frame_cb1, height=3, width=10,
                    textvariable=line_data,
                    name='lineplot',
                    values=data_items)
-
 cb1.current(0)
 cb1.bind('<<ComboboxSelected>>', select_plot_item)
 cb1_label.pack(side="left", fill='x')
 cb1.pack(side="left", fill='x')
 
+frame_cb1.pack(padx=5, fill='both')
+frame_lineplot_ui.pack(padx=5, fill='x')
+
 
 # ---------- Bar plot selection
 bar_data = tk.StringVar(value='TID')
-
-btn_bar_plot = ttk.Button(plotting_ui,
+frame_barplot_ui = ttk.Frame(root, border=4)
+btn_bar_plot = ttk.Button(frame_barplot_ui,
                   text='Bar plot',
                   command=lambda df=data_1, c=bar_data: bar_plot(df, col=c))
+btn_bar_plot.pack(side='left', padx=10)
 
-frame_cb2 = ttk.Frame(plotting_ui, border=4)
+frame_cb2 = ttk.Frame(frame_barplot_ui, border=4)
 cb2_label = ttk.Label(frame_cb2, text="data: ",
                 style="MyLabel.TLabel")
 cb2 = ttk.Combobox(frame_cb2, height=3, width=10,
@@ -528,91 +536,88 @@ cb2 = ttk.Combobox(frame_cb2, height=3, width=10,
                    state="readonly",
                    textvariable=bar_data,
                    name='barplot',
-                   values=data_items
-                   )
-
+                   values=data_items)
 cb2.current(1)
 cb2.bind('<<ComboboxSelected>>', select_plot_item)
 cb2_label.pack(side="left", fill='x')
 cb2.pack(side='left', fill='x')
 
+frame_cb2.pack(padx=5, fill='both')
+frame_barplot_ui.pack(padx=5, fill='x')
 
 # ---------- Scatter plot selection
-btn_scatter_plot = ttk.Button(plotting_ui,
-                   text='scatter plot',
-                   command=lambda df=data_1: scatter_plot(df,
-                                                          source=scatter_data_source,
-                                                          category='',
-                                                          )
-                   )
+scatter_plot_ui = ttk.Frame(root, border=2, relief='raised')
 
-frame_scatter_basic = ttk.Frame(plotting_ui, border=2, relief='groove')
+scatter_basic = ttk.Frame(scatter_plot_ui, border=2, relief='groove')
+# need to grid these child widgets:
+btn_scatter_plot = ttk.Button(scatter_plot_ui,
+                  text='scatter plot',
+                  command=lambda df=data_1: scatter_plot(df,
+                                                         source=scatter_data_source,
+                                                         category='',
+                                                         )
+                  )
+                #   command=lambda df=data_1: scatter_plot(df,
+                #                                          source=scatter_data_source,
+                #                                          category='gender',
+                #                                          catlist=['M', 'F'])
+                #   )
+
 do_category = tk.StringVar()
-do_category_chkb = ttk.Checkbutton(frame_scatter_basic,
-                                   text='Use category:',
-                                   width=15,
-                                   offvalue=-1,
-                                #    onvalue=True,
-                                   variable=do_category,
-                                   command=set_use_category
-                                   )
+do_category_cb = ttk.Checkbutton(scatter_basic,
+                                 text='Use category:',
+                                 width=15,
+                                 variable=do_category)#,
                                 #  style='MyCheckbutton.TCheckbutton')
+
+# category_label = ttk.Label(scatter_basic, text='Category:')
+# category_label.pack(side='top')
 
 category_list = ['gender']
 catlist_var = tk.StringVar(value=category_list)
-category_lb= tk.Listbox(frame_scatter_basic,
-                        height=1,
-                        width=10,
-                        listvariable=catlist_var
-                        )
+category_lb= tk.Listbox(scatter_basic, height=1, width=10, listvariable=catlist_var)
 
-label_cat_list = tk.Label(frame_scatter_basic, text='with value list:')
+btn_scatter_plot.pack(side='left', padx=10)
+# do_category_cb.pack(side='top')
+# category_lb.pack(side='top')
+# scatter_basic.pack(side='left')
 
-category_values = ['(auto)']
-cat_val_var = tk.StringVar(value=category_values)
-cat_val_lb = tk.Listbox(frame_scatter_basic,
-                        height=1,
-                        width=10,
-                        listvariable=cat_val_var
-                        )
+# btn_scatter_plot.grid(row=0, column=0, padx=5, pady=10, sticky='w')
+do_category_cb.grid(row=1, column=0, padx=5, pady=10, sticky='w')
+# category_label.grid(row=2, column=0, padx=5, pady=10, sticky='w')
+category_lb.grid(row=3, column=0, padx=5, pady=10, sticky='w')
 
-print(f'do_category, get-type: {do_category.get()}, {type(do_category.get())}')
-print(f'catlist_var, get-type: {catlist_var.get()}, {type(catlist_var.get())}')
-print(f'cat_val_var, get-type: {cat_val_var.get()}, {type(cat_val_var.get())}')
+scatter_basic.pack(side='left')
 
-do_category_chkb.grid(row=0, column=0, padx=5, sticky='w')
-category_lb.grid(row=1, column=0, padx=5, pady=10, sticky='w')
-label_cat_list.grid(row=2, column=0, padx=5, sticky='w')
-cat_val_lb.grid(row=3, column=0, padx=5, pady=5, sticky='w')
 
-# Scatter plot radio buttons ----------
-radiob_xframe = tk.Frame(plotting_ui,
+
+
+# Radio buttons ----------
+radiob_xframe = tk.Frame(scatter_plot_ui,
                          border=4,
                          name='scatter_x')
-
-label_x = tk.Label(plotting_ui,
+radiob_xframe.pack(padx=5, pady=5)
+label_x = tk.Label(radiob_xframe,
                    text='Plot X',
                    relief='groove',
                    borderwidth=2,
                    font=('Arial', 12, 'bold'))
+label_x.pack(fill='x', pady=5)
 
-# is the container attribute necessary? (defaults to root)
-# xplot = tk.StringVar(radiob_xframe, 'age')
-xplot = tk.StringVar(value='age')
+xplot = tk.StringVar(radiob_xframe, 'age')
 
-radiob_yframe = tk.Frame(plotting_ui,
+radiob_yframe = tk.Frame(scatter_plot_ui,
                          border=4,
                          name='scatter_y')
-
-label_y = tk.Label(plotting_ui,
+radiob_yframe.pack(padx=5, pady=5)
+label_y = tk.Label(radiob_yframe,
                    text='Plot Y',
                    relief='groove',
                    borderwidth=2,
                    font=('Arial', 12, 'bold'))
+label_y.pack(fill='x', pady=5)
 
-# is the container attribute necessary? (defaults to root)
-# yplot = tk.StringVar(radiob_xframe, 'TID')
-yplot = tk.StringVar(value='TID')
+yplot = tk.StringVar(radiob_xframe, 'TID')
 
 for i in data_items:
     radiobutx = tk.Radiobutton(radiob_xframe,
@@ -626,26 +631,12 @@ for i in data_items:
                               variable=yplot,
                               command=lambda y=yplot: scatter_select_y(y))
     radiobuty.pack(anchor='w', padx=5)
+
+radiob_xframe.pack(side='left', pady=10)
+radiob_yframe.pack(side='left', pady=10)
 # ---------- END Radio buttons
 
-
-# grid the plotting UI
-# --------------------
-btn_line_plot.grid(row=0, column=0, padx=5, pady=10, sticky=tk.W)
-frame_cb1.grid(row=0, column=1)
-
-btn_bar_plot.grid(row=1, column=0, padx=5, pady=10, sticky=tk.W)
-frame_cb2.grid(row=1, column=1)
-
-btn_scatter_plot.grid(row=2, column=0, padx=5, sticky=tk.W)#, pady=10)
-label_x.grid(row=2, column=2)
-label_y.grid(row=2, column=3)
-
-frame_scatter_basic.grid(row=3, column=1, padx=5)
-radiob_xframe.grid(row=3, column=2)
-radiob_yframe.grid(row=3, column=3)
-
-plotting_ui.pack(padx=5, pady=5)
+scatter_plot_ui.pack(padx=5, fill='x')
 
 
 btnq = ttk.Button(root, text='Quit', command=root.destroy)
