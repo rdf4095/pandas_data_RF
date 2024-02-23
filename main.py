@@ -45,14 +45,16 @@ history:
             nonempty. Move "all data" button to bottom of filter_ui frame.
 02-16-2024  Begin changing the plotting UI to grid geometry.
 02-17-2024  Remove commented .pack calls, and unnecessary variables.
-"""
-"""
+02-22-2024  Debug category setting for scatter plots. Remove commented-out code.
+            Update comments and TODO.
+
 TODO:
     - Need global vars for data column(s) to use for line,bar plots.
     - use tkinter.font to control multiple Labels, and the '+' character
     - separate data_filter() into 2 parts: 1) construct query, 2) apply filter,
-      since we will eventually apply filters programmatically, instead of
-      interactively.
+      since we will eventually apply filters programmatically.
+    - separate scatter plot functionality into 2 parts: 1) get settings, 2) create plot,
+      since we may eventually change plot settings programmatically.
     - data_filter now returns -1 if the filter failed. Try
       reading this by replacing the button's command attribute
       with a bind().
@@ -83,11 +85,50 @@ def attend():
 # def read_checkb(var):
 #     print("\t", var.get())
 
-
 def set_use_category():
-    print(f'set_use_category: {do_category.get()}')
+    """Checkbutton callback: use categories or not."""
+    do_cat = do_category.get()
+    print(f'in set_use_category: {do_cat}')
+    print(f'({type(do_cat)})')
+    print()
+
+    if int(do_cat) == 1:
+        print('setting category...')
+        category_lb.select_clear(0)
+        category_lb.select_set(1)
+        print(f'   {category_list[1]}')
+        cat_var.set(category_list[1])
+    else:
+        category_lb.select_clear(1)
+        category_lb.select_set(0)
 
 
+
+"""
+category_list = ['gender']
+cat_var = tk.StringVar(value = '')
+category_lb
+
+category_values = ['(auto)']
+cat_val_var = tk.StringVar(value=category_values)
+catlist_lb
+"""
+
+
+def set_category(ev):
+    """First Listbox callback: select the categorical variable (column)."""
+
+    for i in category_lb.curselection():
+        print(category_lb.get(i))
+    print()
+
+
+def set_category_value_list(ev):
+    """Second Listbox callback: set the category value list."""
+
+    cat_list = catlist_lb.get(catlist_lb.curselection())
+    print(f'in set_category list: {cat_list}')
+    print()
 
 
 def add_criterion_row(n):
@@ -337,9 +378,9 @@ def bar_plot(df: pd.DataFrame, col: tk.StringVar):
 
 
 def scatter_plot(df: pd.DataFrame, 
-                 source: object,
-                 category: str = '',
-                 catlist: list = []) -> None:
+                 source: object) -> None:
+                #  category: str = '',
+                #  catlist: list = []) -> None:
     """Create scatter plot for input df.
     
     Makes a copy of the DataFrame object passed in, to avoid mutating it.
@@ -347,8 +388,10 @@ def scatter_plot(df: pd.DataFrame,
     df2 = pd.DataFrame(df)
     plot_data = None
 
-    # category = 'gender'
-    # catlist = ['M', 'F']
+    # get relevant settings
+    category = cat_var.get()
+    catlist = ['M', 'F']
+
 
     def create_plot(data, cat):
         data.plot.scatter(x=source['x'],
@@ -363,6 +406,7 @@ def scatter_plot(df: pd.DataFrame,
             df2[category] = df2[category].astype('category')
             plot_data = df2
         else:
+            print('if category else...')
             df2[category] = pd.Categorical(df2[category], categories=catlist, ordered=False)    
             plot_data = df2[df2[category].isin(catlist)]
     else:
@@ -488,7 +532,7 @@ filter_ui.pack(padx=5, pady=5, fill='both')
 
 # plotting UI
 # ===========
-plotting_ui = ttk.Frame(root, border=4)
+plotting_ui = ttk.Frame(root, border=2, relief='raised')
 
 # ---------- Line plot selection
 line_data = tk.StringVar(value='age')
@@ -538,52 +582,80 @@ cb2.pack(side='left', fill='x')
 
 
 # ---------- Scatter plot selection
+category_list = ['', 'gender', 'other']
+cat_var = tk.StringVar()
+
+category_values = ['(auto)']
+cat_val_var = tk.StringVar(value=category_values)
+
 btn_scatter_plot = ttk.Button(plotting_ui,
                    text='scatter plot',
-                   command=lambda df=data_1: scatter_plot(df,
+                #    command=lambda df=data_1, cat=cat_var.get(), clist=cat_val_var.get(): scatter_plot(df,
+                   command=lambda df=data_1, clist=cat_val_var.get(): scatter_plot(df,
                                                           source=scatter_data_source,
-                                                          category='',
+                                                          catlist=clist
                                                           )
                    )
 
 frame_scatter_basic = ttk.Frame(plotting_ui, border=2, relief='groove')
-do_category = tk.StringVar()
+do_category = tk.StringVar(value = -1)
 do_category_chkb = ttk.Checkbutton(frame_scatter_basic,
                                    text='Use category:',
                                    width=15,
                                    offvalue=-1,
-                                #    onvalue=True,
                                    variable=do_category,
                                    command=set_use_category
                                    )
                                 #  style='MyCheckbutton.TCheckbutton')
 
-category_list = ['gender']
-catlist_var = tk.StringVar(value=category_list)
+# category_list = ['gender']
+# cat_var = tk.StringVar(value=category_list)
 category_lb= tk.Listbox(frame_scatter_basic,
-                        height=1,
-                        width=10,
-                        listvariable=catlist_var
+                        exportselection=False,
+                        height=2,
+                        width=10
+                        # listvariable=cat_var
                         )
+category_lb.bind('<<ListboxSelect>>', set_category)
+category_lb.select_set(0)
+
+# for ind, val in enumerate(category_list):
+#     category_lb.insert(ind, val)
 
 label_cat_list = tk.Label(frame_scatter_basic, text='with value list:')
 
-category_values = ['(auto)']
-cat_val_var = tk.StringVar(value=category_values)
-cat_val_lb = tk.Listbox(frame_scatter_basic,
-                        height=1,
-                        width=10,
-                        listvariable=cat_val_var
-                        )
+# category_values = ['(auto)']
+# cat_val_var = tk.StringVar(value=category_values)
+# TODO: make this an Entry (use only one categorical variable at a time)
+# OLD:
+# catlist_lb = tk.Listbox(frame_scatter_basic,
+#                         exportselection=False,
+#                         height=1,
+#                         width=10
+#                         # listvariable=cat_val_var
+#                         )
 
-print(f'do_category, get-type: {do_category.get()}, {type(do_category.get())}')
-print(f'catlist_var, get-type: {catlist_var.get()}, {type(catlist_var.get())}')
-print(f'cat_val_var, get-type: {cat_val_var.get()}, {type(cat_val_var.get())}')
+# catlist_lb.bind('<<ListboxSelect>>', set_category_value_list)
+
+# NEW:
+category_values_ent = ttk.Entry(frame_scatter_basic,
+                                exportselection=False,
+                                textvariable=cat_val_var)
+
+
+# print(f'do_category, get-type: {do_category.get()}, {type(do_category.get())}')
+# print(f'catlist_var, get-type: {cat_var.get()}, {type(cat_var.get())}')
+# print(f'cat_val_var, get-type: {cat_val_var.get()}, {type(cat_val_var.get())}')
 
 do_category_chkb.grid(row=0, column=0, padx=5, sticky='w')
-category_lb.grid(row=1, column=0, padx=5, pady=10, sticky='w')
+
+# category_lb.grid(row=1, column=0, padx=5, pady=10, sticky='w')
+category_values_ent.grid(row=1, column=0, padx=5, pady=10, sticky='w')
+
+
+# list1_sb.grid(row=1, column=1, sticky='w')
 label_cat_list.grid(row=2, column=0, padx=5, sticky='w')
-cat_val_lb.grid(row=3, column=0, padx=5, pady=5, sticky='w')
+catlist_lb.grid(row=3, column=0, padx=5, pady=5, sticky='w')
 
 # Scatter plot radio buttons ----------
 radiob_xframe = tk.Frame(plotting_ui,
