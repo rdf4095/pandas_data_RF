@@ -9,9 +9,12 @@ author: Russell Folks
 history:
 -------
 02-24-2024  creation
+03-03-2024  Add create_widgets() to FramedCombo class. Pass in label value.
+03-04-2024  Use **kwargs for FramedCombo class.
 """
 
 import sys
+import tkinter as tk
 from tkinter import ttk
 
 this = sys.modules[__name__]
@@ -36,31 +39,41 @@ class MyEntry(ttk.Entry):
 
 
 class FramedCombo(ttk.Frame):
-    def __init__(self, parent, cb_values=None, boxname='', var=None, **kwargs):
-        super().__init__(parent, **kwargs,
-                         border=4)
-        self.cb_values = cb_values
+    # def __init__(self, parent, cb_values=None, name='', var=None, posn=[0,0]):
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent)
 
-        lab = ttk.Label(self,
-                        text='Y data: ')
+        self.parent = parent
+        # self.cb_values = cb_values
+        # self.boxname = name
+        # self.var = var
+        # self.posn = posn
+        # self.label_name = name[0].upper() + name[1:]
+        self.cb_values = kwargs['cb_values']
+        self.var = kwargs['var']
+        self.posn = kwargs['posn']
+        self.name = kwargs['name']
+
+        self.label_name = self.name[0].upper() + self.name[1:]
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.lab = ttk.Label(self,
+                        text=self.label_name)
         
-        print('in FramedCombo:')
-        print(f'   cb_values: {cb_values}')
-        print(f'   var: {var.get()}')
-
-        cb = ttk.Combobox(self,
+        self.cb = ttk.Combobox(self,
                           height=3,
                           width=10,
                           exportselection=False,
                           state='readonly',
-                          name=boxname,
+                          name=self.name,
                           values=self.cb_values,
-                          textvariable=var
+                          textvariable=self.var
                           )
-        cb.current(0)
+        self.cb.current(0)
 
-        lab.pack(side='left', fill='x')
-        cb.pack(side='left', fill='x')
+        self.lab.pack(side='left', fill='x')
+        self.cb.pack(side='left', fill='x')
 
-
-    
+        self.grid(row=self.posn[0], column=self.posn[1])

@@ -55,18 +55,18 @@ history:
             and bar plot UI elements to a class in plotting_ui.py. This object
             includes a Frame, Label and Combobox for selecting plot parameters.
             Future: Verify we don't need select_plot_item() and then delete.
+03-03-2024  Remove commented code (before FramedCombo class.)
+            Remove select_plot_item().
 
 TODO:
-    - ? Need global vars for data column(s) to use for line,bar plots.
-        vs: pass values to/from functions.
     - use tkinter.font to control multiple Labels, and the '+' character
     - separate data_filter() into 2 parts: 1) construct query, 2) apply filter,
       since we will eventually apply filters programmatically.
-    - separate scatter plot functionality into 2 parts: 1) get settings, 2) create plot,
-      since we may eventually change plot settings programmatically.
     - data_filter now returns -1 if the filter failed. Try
       reading this by replacing the button's command attribute
       with a bind().
+    - separate scatter plot functionality into 2 parts: 1) get settings, 2) create plot,
+      since we may eventually change plot settings programmatically.
     - There is a mixture of tk and ttk widgets. ? consistency.
 """
 
@@ -195,21 +195,6 @@ def select_filter_column(ev):
     print()
 
 
-# def select_plot_item(ev):
-#     """Read Combobox widgets to get items for line or bar plot."""
-
-#     which_plot = ev.widget.winfo_name()
-#     val = ev.widget.get()
-#     print(f'Combobox {which_plot} set to: {val}')
-
-#     match which_plot:
-#         case 'lineplot':
-#             line_data.set(val)
-#             # print(f'...plotting: {line_data.get()}')
-#         case 'barplot':
-#             bar_data.set(val)
-    
-
 def scatter_select_x(x):
     """Select X data for scatter plot."""
 
@@ -244,7 +229,6 @@ def clean_column_names(df):
     return df
 
 
-# def data_filter(win, dcolumn=None):
 def data_filter(win):
     """Display a filtered version of the original DataFrame."""
 
@@ -371,7 +355,7 @@ def data_unfilter(win, df):
     win.tag_add('cyanbkg', '1.0', '1.end')
 
 
-def line_plot(df: pd.DataFrame,
+def line_plot_ORIG(df: pd.DataFrame,
               xcol: str,
               ycol: tk.StringVar) -> None:
     """Create line plot (the default) for input df."""
@@ -390,15 +374,41 @@ def line_plot(df: pd.DataFrame,
     plt.show()
 
 
+def line_plot(df: pd.DataFrame,
+              xcol: tk.StringVar,
+              ycol: tk.StringVar) -> None:
+    """Create line plot (the default) for input df."""
+
+    xdata = xcol.get()
+    ydata = ycol.get()
+    dfsort = df.sort_values(by=xdata)
+
+    print('line_plot params:')
+    print(f'   xcol: {xcol} = {xdata}')
+    print(f'   ycol: {ycol} = {ydata}')
+    print()
+
+    # ? use df.plot.line for clarity
+    # df.plot(x=xcol, y=ydata)
+    dfsort.plot(x=xdata, y=ydata)
+    plt.show()
+
+
 def bar_plot(df: pd.DataFrame,
-             xcol: str,
+             xcol: tk.StringVar,
              ycol: tk.StringVar) -> None:
     """Create bar plot for input df."""
 
+    xdata = xcol.get()
     ydata = ycol.get()
-    dfsort = df.sort_values(by=ydata)
+    dfsort = df.sort_values(by=xdata)
 
-    dfsort.plot.bar(x=xcol, y=ydata)
+    print('bar_plot params:')
+    print(f'   xcol: {xcol} = {xdata}')
+    print(f'   ycol: {ycol} = {ydata}')
+    print()
+
+    dfsort.plot.bar(x=xdata, y=ydata)
     plt.show()
 
 
@@ -452,6 +462,7 @@ def scatter_plot(df: pd.DataFrame,
 
 root = tk.Tk()
 root.title = 'myocardial strain'
+
 
 # Style objects will be added later.
 # style = ttk.Style()
@@ -573,69 +584,48 @@ filter_ui.pack(padx=5, pady=5, fill='both')
 # ===========
 plotting_main = ttk.Frame(root, border=2, relief='raised')
 
-# ---------- Line plot selection
-# maybe:
+# ---------- Line plot
 # line_data = tk.StringVar(value=data_columns[2])
-line_data = tk.StringVar(value='default_line')
+line_data_x = tk.StringVar()
+line_data_y = tk.StringVar()
 
 btn_line_plot = ttk.Button(plotting_main,
                   text='Line plot',
-                  command=lambda df=data_1, x=data_columns[0], c=line_data: line_plot(df, x, c))
+                #   command=lambda df=data_1, x=data_columns[0], y=line_data: line_plot(df, x, y))
+                  command=lambda df=data_1, x=line_data_x, y=line_data_y: line_plot(df, x, y))
 
-# frame_cb1 = ttk.Frame(plotting_main, border=4)
+frame_line_x = plotui.FramedCombo(plotting_main,
+                                  cb_values=data_columns,
+                                  name='x data',
+                                  var=line_data_x,
+                                  posn=[0,1])
 
-# cb1_label = ttk.Label(frame_cb1,
-#                       text="Y data: ",
-#                       style="MyLabel.TLabel")
+frame_line_y = plotui.FramedCombo(plotting_main,
+                                  cb_values=data_columns[2:],
+                                  name='y data',
+                                  var=line_data_y,
+                                  posn=[0,2])
 
-# cb1 = ttk.Combobox(frame_cb1, height=3, width=10,
-#                    exportselection=False,
-#                    state='readonly',
-#                    textvariable=line_data,
-#                    name='lineplot',
-#                    values=data_columns)
-
-# cb1.current(0)
-# cb1.bind('<<ComboboxSelected>>', select_plot_item)
-# cb1_label.pack(side="left", fill='x')
-# cb1.pack(side="left", fill='x')
-
-frame_cb1 = plotui.FramedCombo(plotting_main,
-                               cb_values=data_columns[2:],
-                               boxname='lineplot',
-                               var=line_data)
-
-# ---------- Bar plot selection
+# ---------- Bar plot
 # bar_data = tk.StringVar(value=data_columns[2])
-bar_data = tk.StringVar(value='default_bar')
+bar_data_x = tk.StringVar()
+bar_data_y = tk.StringVar()
 
 btn_bar_plot = ttk.Button(plotting_main,
                   text='Bar plot',
-                  command=lambda df=data_1, x=data_columns[0], c=bar_data: bar_plot(df, x, c))
+                  command=lambda df=data_1, x=bar_data_x, y=bar_data_y: bar_plot(df, x, y))
 
-# frame_cb2 = ttk.Frame(plotting_main, border=4)
+frame_bar_x = plotui.FramedCombo(plotting_main,
+                               cb_values=data_columns,
+                               name='x data',
+                               var=bar_data_x,
+                               posn=[1,1])
 
-# cb2_label = ttk.Label(frame_cb2,
-#                       text="Y data: ",
-#                       style="MyLabel.TLabel")
-
-# cb2 = ttk.Combobox(frame_cb2, height=3, width=10,
-#                    exportselection=False,
-#                    state="readonly",
-#                    textvariable=bar_data,
-#                    name='barplot',
-#                    values=data_columns
-#                    )
-# cb2.current(1)
-# cb2.bind('<<ComboboxSelected>>', select_plot_item)
-# cb2_label.pack(side="left", fill='x')
-# cb2.pack(side='left', fill='x')
-
-frame_cb2 = plotui.FramedCombo(plotting_main,
+frame_bar_y = plotui.FramedCombo(plotting_main,
                                cb_values=data_columns[1:],
-                               boxname='barplot',
-                               var=bar_data)
-
+                               name='y data',
+                               var=bar_data_y,
+                               posn=[1,2])
 
 # ---------- Scatter plot selection
 btn_scatter_plot = ttk.Button(plotting_main,
@@ -687,8 +677,10 @@ do_category_chkb.grid(row=0, column=0, padx=5, sticky='w')
 
 category_lb.grid(row=1, column=0, padx=5, pady=10, sticky='w')
 
-label_cat_list.grid(row=2, column=0, padx=5, sticky='w')
-category_values_ent.grid(row=3, column=0, padx=5, pady=5, sticky='w')
+# label_cat_list.grid(row=2, column=0, padx=5, sticky='w')
+# category_values_ent.grid(row=3, column=0, padx=5, pady=5, sticky='w')
+label_cat_list.grid(row=0, column=1, padx=5, sticky='w')
+category_values_ent.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
 # Scatter plot radio buttons ----------
 radiob_xframe = tk.Frame(plotting_main,
@@ -737,16 +729,17 @@ for i in data_columns:
 # grid the plotting UI
 # --------------------
 btn_line_plot.grid(row=0, column=0, padx=5, pady=10, sticky=tk.W)
-frame_cb1.grid(row=0, column=1)
+
+# frame_cb1.grid(row=0, column=1)
 
 btn_bar_plot.grid(row=1, column=0, padx=5, pady=10, sticky=tk.W)
-frame_cb2.grid(row=1, column=1)
+# frame_cb2.grid(row=1, column=1)
 
 btn_scatter_plot.grid(row=2, column=0, padx=5, sticky=tk.W)#, pady=10)
 label_x.grid(row=2, column=2)
 label_y.grid(row=2, column=3)
 
-frame_scatter_basic.grid(row=3, column=1, padx=5, pady=5)
+frame_scatter_basic.grid(row=3, column=0, padx=5, pady=5)
 radiob_xframe.grid(row=3, column=2)
 radiob_yframe.grid(row=3, column=3)
 
