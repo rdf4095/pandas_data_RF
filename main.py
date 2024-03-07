@@ -420,13 +420,24 @@ def bar_plot(df: pd.DataFrame,
 
 
 def scatter_plot(df: pd.DataFrame, 
-                 source: object) -> None:
+                 x_variable: tk.StringVar,
+                 y_variable: tk.StringVar) -> None:
     """Create scatter plot for input df.
     
     Makes a copy of the DataFrame object passed in, to avoid mutating it.
     """
     df2 = pd.DataFrame(df)
     plot_data = None
+
+
+
+    # source['x'] = x_variable.get()
+    # source['y'] = y_variable.get()
+
+    source = {'x': x_variable.get(),
+              'y': y_variable.get()}
+    print(f"source x,y: {source['x']}, {source['y']}")
+
 
     category = category_lb.get(category_lb.curselection())
 
@@ -445,7 +456,7 @@ def scatter_plot(df: pd.DataFrame,
 
     if category:
         if ((not catlist) or catlist == None or (not isinstance(catlist, list))):
-            print('\nWARNING: no valid category list; finding category values...\n')
+            print('\nWARNING: no category list; finding category values...\n')
             df2[category] = df2[category].astype('category')
             plot_data = df2
         else:
@@ -483,8 +494,8 @@ output_win.pack(padx=10, pady=10, fill='x', expand=True)
 data_columns = ["gender", "age", "TID", "stress EF", "rest EF"]
 line_data_source = 'age'
 bar_data_source = 'TID'
-scatter_data_source = {'x': 'age',
-                       'y': 'TID'}
+# scatter_data_source = {'x': 'age',
+                    #    'y': 'TID'}
 output_win.tag_configure("cyanbkg", background="cyan")
 output_win.tag_configure("yellowbkg", background="yellow")
 
@@ -628,11 +639,11 @@ frame_bar_y = plotui.FramedCombo(plotting_main,
                                posn=[1,2])
 
 # ---------- Scatter plot selection
+scatter_x = tk.StringVar()
+scatter_y = tk.StringVar()
 btn_scatter_plot = ttk.Button(plotting_main,
-                   text='scatter plot',
-                   command=lambda df=data_1, src=scatter_data_source: scatter_plot(df,
-                                                          source=src
-                                                          )
+                   text='Scatter plot',
+                   command=lambda df=data_1, x=scatter_x, y=scatter_y: scatter_plot(df, x, y)
                    )
 
 frame_scatter_basic = ttk.Frame(plotting_main, border=2, relief='groove')
@@ -683,47 +694,58 @@ label_cat_list.grid(row=0, column=1, padx=5, sticky='w')
 category_values_ent.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
 # Scatter plot radio buttons ----------
-radiob_xframe = tk.Frame(plotting_main,
-                         border=4,
-                         name='scatter_x')
+# radiob_xframe = tk.Frame(plotting_main,
+#                          border=4,
+#                          name='scatter_x')
 
-label_x = tk.Label(plotting_main,
-                   text='Plot X',
-                   relief='groove',
-                   borderwidth=2,
-                   font=('Arial', 12, 'bold'))
-
-# ? value of the container attribute (defaults to root)
-# xplot = tk.StringVar(radiob_xframe, 'age')
-xplot = tk.StringVar(value='age')
-
-radiob_yframe = tk.Frame(plotting_main,
-                         border=4,
-                         name='scatter_y')
-
-label_y = tk.Label(plotting_main,
-                   text='Plot Y',
-                   relief='groove',
-                   borderwidth=2,
-                   font=('Arial', 12, 'bold'))
+# label_x = tk.Label(plotting_main,
+#                    text='Plot X',
+#                    relief='groove',
+#                    borderwidth=2,
+#                    font=('Arial', 12, 'bold'))
 
 # ? value of the container attribute (defaults to root)
-# yplot = tk.StringVar(radiob_xframe, 'TID')
-yplot = tk.StringVar(value='TID')
+# xplot = tk.StringVar(value='age')
 
-for i in data_columns:
-    radiobutx = tk.Radiobutton(radiob_xframe,
-                              text=i, value=i,
-                              variable=xplot,
-                              command=lambda x=xplot: scatter_select_x(x))
-    radiobutx.pack(anchor='w', padx=5)
+# radiob_yframe = tk.Frame(plotting_main,
+#                          border=4,
+#                          name='scatter_y')
 
-    radiobuty = tk.Radiobutton(radiob_yframe,
-                              text=i, value=i,
-                              variable=yplot,
-                              command=lambda y=yplot: scatter_select_y(y))
-    radiobuty.pack(anchor='w', padx=5)
-# ---------- END Radio buttons
+# label_y = tk.Label(plotting_main,
+#                    text='Plot Y',
+#                    relief='groove',
+#                    borderwidth=2,
+#                    font=('Arial', 12, 'bold'))
+
+# ? value of the container attribute (defaults to root)
+# yplot = tk.StringVar(value='TID')
+
+# for i in data_columns:
+#     radiobutx = tk.Radiobutton(radiob_xframe,
+#                               text=i, value=i,
+#                               variable=xplot,
+#                               command=lambda x=xplot: scatter_select_x(x))
+#     radiobutx.pack(anchor='w', padx=5)
+
+#     radiobuty = tk.Radiobutton(radiob_yframe,
+#                               text=i, value=i,
+#                               variable=yplot,
+#                               command=lambda y=yplot: scatter_select_y(y))
+#     radiobuty.pack(anchor='w', padx=5)
+# ----------- END radio buttons
+
+# new ui
+scatter_x_fr = plotui.FramedCombo(plotting_main,
+                               cb_values=data_columns,
+                               name='x data',
+                               var=scatter_x,
+                               posn=[2,1])
+
+scatter_y_fr = plotui.FramedCombo(plotting_main,
+                               cb_values=data_columns[1:],
+                               name='y data',
+                               var=scatter_y,
+                               posn=[2,2])
 
 
 # grid the plotting UI
@@ -735,13 +757,13 @@ btn_line_plot.grid(row=0, column=0, padx=5, pady=10, sticky=tk.W)
 btn_bar_plot.grid(row=1, column=0, padx=5, pady=10, sticky=tk.W)
 # frame_cb2.grid(row=1, column=1)
 
-btn_scatter_plot.grid(row=2, column=0, padx=5, sticky=tk.W)#, pady=10)
-label_x.grid(row=2, column=2)
-label_y.grid(row=2, column=3)
+btn_scatter_plot.grid(row=2, column=0, padx=5, pady=10, sticky=tk.W)
+# label_x.grid(row=2, column=2)
+# label_y.grid(row=2, column=3)
 
-frame_scatter_basic.grid(row=3, column=0, padx=5, pady=5)
-radiob_xframe.grid(row=3, column=2)
-radiob_yframe.grid(row=3, column=3)
+frame_scatter_basic.grid(row=3, column=0, columnspan=3, padx=5, pady=10)
+# radiob_xframe.grid(row=3, column=2)
+# radiob_yframe.grid(row=3, column=3)
 
 plotting_main.pack(padx=5, pady=5)
 

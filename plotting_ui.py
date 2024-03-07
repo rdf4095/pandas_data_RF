@@ -11,10 +11,11 @@ history:
 02-24-2024  creation
 03-03-2024  Add create_widgets() to FramedCombo class. Pass in label value.
 03-04-2024  Use **kwargs for FramedCombo class.
+03-05-2024  Append separator character(s) to Label.
 """
 
 import sys
-import tkinter as tk
+# import tkinter as tk
 from tkinter import ttk
 
 this = sys.modules[__name__]
@@ -39,22 +40,17 @@ class MyEntry(ttk.Entry):
 
 
 class FramedCombo(ttk.Frame):
-    # def __init__(self, parent, cb_values=None, name='', var=None, posn=[0,0]):
     def __init__(self, parent, **kwargs):
         super().__init__(parent)
 
         self.parent = parent
-        # self.cb_values = cb_values
-        # self.boxname = name
-        # self.var = var
-        # self.posn = posn
-        # self.label_name = name[0].upper() + name[1:]
         self.cb_values = kwargs['cb_values']
         self.var = kwargs['var']
         self.posn = kwargs['posn']
         self.name = kwargs['name']
+        self.sep = ': '
 
-        self.label_name = self.name[0].upper() + self.name[1:]
+        self.label_name = self.name[0].upper() + self.name[1:] + self.sep
 
         self.create_widgets()
 
@@ -76,4 +72,4 @@ class FramedCombo(ttk.Frame):
         self.lab.pack(side='left', fill='x')
         self.cb.pack(side='left', fill='x')
 
-        self.grid(row=self.posn[0], column=self.posn[1])
+        self.grid(row=self.posn[0], column=self.posn[1], padx=10)
