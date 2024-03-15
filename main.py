@@ -57,6 +57,11 @@ history:
             Future: Verify we don't need select_plot_item() and then delete.
 03-03-2024  Remove commented code (before FramedCombo class.)
             Remove select_plot_item().
+03-07-2024  Use FramedCombo class for scatter plot UI. Pass only tk.StringVars
+            to scatter_plot(). This is a step toward making the fxn generic.
+            Remove old radio button definition to a textfile to document how
+            it was done.
+03-10-2024  Debug add/delete filter row.
 
 TODO:
     - use tkinter.font to control multiple Labels, and the '+' character
@@ -65,8 +70,6 @@ TODO:
     - data_filter now returns -1 if the filter failed. Try
       reading this by replacing the button's command attribute
       with a bind().
-    - separate scatter plot functionality into 2 parts: 1) get settings, 2) create plot,
-      since we may eventually change plot settings programmatically.
     - There is a mixture of tk and ttk widgets. ? consistency.
 """
 
@@ -77,9 +80,11 @@ from tkinter import ttk
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from importlib.machinery import SourceFileLoader
 
-# external widget UI
 import plotting_ui as plotui
+
+styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_module()
 
 """ 
 ----------------------------
@@ -145,21 +150,76 @@ def set_category_value_list(ev):
 
 
 def add_criterion_row(n):
-    """Add a row of widgets to input a filter criterion."""
+    """Add a row of widgets to define a filter criterion."""
 
-    if n == len(filt_rows):
-        # no more rows
+    print(f'add row')
+
+    rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
+    num_gridded = len(rows_gridded)
+    print('rows on grid:')
+    for r in rows_gridded:
+        print(f'   {r}')
+    if num_gridded == len(filt_rows):
         return
 
-    filt_rows[n].grid(row=n, column=0)
-    filt_buttons[n - 1].configure(text = '-')
+    rows_not_gridded = [r for r in filt_rows if len(r.grid_info().items()) == 0]
+    num_not_gridded = len(rows_not_gridded)
+    print('rows not on grid:')
+    for r in rows_not_gridded:
+        print(f'   {r}')
 
-    if n == len(filt_rows) - 1:
-        # this is the last row
-        filt_buttons[n].configure(text = '-')
+    print('   removing all "+"')
+    for r in filt_rows[0:n]:
+        r.winfo_children()[3].grid_remove()
 
-    # change callback fxn to remove the row...
-    filt_buttons[n - 1].configure(command=lambda d=n - 1: remove_criterion_row(d))
+    rows_not_gridded[0].grid(row=n, column=0, sticky='nw')
+
+    print(f'   adding "+" for row {rows_not_gridded[0]}')
+    rows_not_gridded[0].winfo_children()[3].grid(row=n, column=3, sticky='w')
+
+    print()
+
+
+def ORIG_remove_criterion_row(n):
+    """Remove a row of widgets for a filter criterion.
+    
+       Data is automatically re-filtered by the remaining criteria.
+    """
+    print(f'remove row {n}:')
+    rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
+    num_gridded = len(rows_gridded)
+    print(f'   rows on grid: {num_gridded}')
+
+    if num_gridded == 1:
+        return
+    
+    # clear filter for the row
+    # print(f'   clearing filter for row {n}')
+    filt_cboxes[n].set('')
+    filt_entries[n].delete(0, tk.END)
+
+    # don't remove the only row
+    # if num_gridded > 1:
+    print(f'   removing row {n}')
+    filt_rows[n].grid_remove()
+    # num_gridded -= 1
+    
+    rows_now_gridded = [r for r in rows_gridded if len(r.grid_info().items()) > 0]
+    num_now_gridded = len(rows_now_gridded)
+
+    # reset display of '-' and '+' buttons
+    print('   removing all "+"')
+    for row in rows_now_gridded:
+        # print(f'row filt {row.winfo_children()[0].get()}')
+        row.winfo_children()[3].grid_remove()
+
+    print(f'   adding "+" for row {num_now_gridded - 1}')
+    print(f'      filt_vars is {filt_vars[num_now_gridded].get()}')
+    # print(f'      cb set to {rows_now_gridded[-1].winfo_children()[0].get()}')
+    # rows_now_gridded[-1].winfo_children()[3].grid(row=num_now_gridded - 1, column=3, sticky='w')
+    rows_now_gridded[-1].winfo_children()[3].grid(row=num_now_gridded, column=3, sticky='w')
+    print()
+    data_filter(output_win)
 
 
 def remove_criterion_row(n):
@@ -167,47 +227,78 @@ def remove_criterion_row(n):
     
        Data is automatically re-filtered by the remaining criteria.
     """
-    # TODO:
-    # if the user adds a row and skips entering anything in it,
-    # the app will lose track of which rows should have '-' and '+'
-    # (all will have '-')
+    rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
+    num_gridded = len(rows_gridded)
+    print('rows on grid:')
+    for r in rows_gridded:
+        print(f'   {r}')
 
-    filt_buttons[n].configure(text = '+')
-
-    filt_entries[n].delete(0, tk.END)
-
-    filt_cboxes[n].set('')
+    if num_gridded == 1:
+        return
     
-    filt_rows[n].grid_remove()
+    # clear filter for the row
+    # filt_cboxes[n].set('')
+    # filt_entries[n].delete(0, tk.END)
+    n.winfo_children()[0].set('')
+    n.winfo_children()[1].delete(0, tk.END)
 
+    # don't remove the only row
+    print(f'removing row {n}')
+    # filt_rows[n].grid_remove()
+    rows_gridded[-2].winfo_children()[3].grid(row=num_gridded - 2, column=3, sticky='nw')
+    n.grid_remove()
+    
+    rows_now_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
+    num_now_gridded = len(rows_now_gridded)
+
+    print(f'rows now on grid: {num_now_gridded}')
+    for index, r in enumerate(rows_now_gridded):
+        print(f'   {r}')
+        r.rowconfigure(index, weight=1)
+
+
+    # re-configure the grid for the current rows
+    # for index, row in enumerate(rows_now_gridded):
+    #     print(f'   index {index}, row {row}')
+    #     row.grid(row=index, column=0, sticky='nw')
+
+        # row.winfo_children()[3].grid_remove()
+    
+    # print(f'   adding "+" for row {rows_now_gridded[-1]}')
+    # rows_now_gridded[-1].winfo_children()[3].grid(row=num_now_gridded, column=3, sticky='nw')
+
+    print()
     data_filter(output_win)
 
 
-# Not used. Is there a use for it?
+# Not used. Might be used to construct a string to document the filter
+# e.g. for exporting the filtered list.
 def select_filter_column(ev):
     """Read Combobox to get item for data filter."""
 
     which_filt = ev.widget.winfo_name()
     val = ev.widget.get()
-    print('in select_filter_column:')
-    print(f'...from {which_filt}, filt by: {val}')
-    print(f'...widget parent: {ev.widget.winfo_parent()}')
-    print()
+    # print('in select_filter_column:')
+    # print(f'...from {which_filt}, filt by: {val}')
+    # print(f'...widget parent: {ev.widget.winfo_parent()}')
+    # print()
 
 
+# NOT USED
 def scatter_select_x(x):
     """Select X data for scatter plot."""
 
     value = x.get()
-    scatter_data_source['x'] = value
+    # scatter_data_source['x'] = value
     print(f'x to plot: {value}')
 
 
+# NOT USED
 def scatter_select_y(y):
     """Select Y data for scatter plot."""
     
     value = y.get()
-    scatter_data_source['y'] = value
+    # scatter_data_source['y'] = value
     print(f'y to plot: {value}')
 
 
@@ -248,14 +339,13 @@ def data_filter(win):
             dcolumn.append(filt_vars[i].get())
             criteria.append(criterion_vars[i].get())
 
-            print(f'i is: {i}')
-            print(f'...filt: {filt_vars[i].get()}, criterion: {criterion_vars[i].get()}')
-            print()
-            print(f'...criteria list: {criteria}')
-            print()
+            # print(f'i is: {i}')
+            # print(f'...filt: {filt_vars[i].get()}, criterion: {criterion_vars[i].get()}')
+            # print()
+            # print(f'...criteria list: {criteria}')
+            # print()
 
             current_criterion = len(criteria) - 1
-            # validated_entry = validate_criterion(criteria[i])
             validated_entry = validate_criterion(criteria[current_criterion])
             if validated_entry['value'] != '':
     
@@ -269,9 +359,7 @@ def data_filter(win):
                 else:
                     # assume a string value
                     quote = '\"'
-                # q_expression = dcolumn[i] + filter_term['op'] + quote + filter_term['value'] + quote
                     
-                # current_term = dcolumn[i] + validated_entry['op'] + quote + validated_entry['value'] + quote
                 current_term = dcolumn[current_criterion] + validated_entry['op'] + quote + validated_entry['value'] + quote
             else:
                 print('No valid criterion.')
@@ -279,22 +367,26 @@ def data_filter(win):
             terms.append(current_term)
 
     if len(terms) == 0:
-        # no valid filter for this criterion row
+        # no valid filter
         return -1
             
     for t in terms:
         q_expression += (t + ' & ')
     q_expression = q_expression[:-3]
 
-    print()
-    print(f'filt columns: {dcolumn}')
-    print(f'filt criteria: {criteria}')
-    print(f'q_expression string: {repr(q_expression)}')
+    # print(f'filt columns: {dcolumn}')
+    # print(f'filt criteria: {criteria}')
+    # print(f'q_expression string: {repr(q_expression)}')
+    # print()
 
     dfresult = data_1.query(q_expression)
     win.delete('1.0', tk.END)
     win.insert('1.0', dfresult)
     win.tag_add('yellowbkg', '1.0', '1.end')
+
+    # update buttons to reflect filter/no filter
+    btn_data_unfilter.configure(style='MyButton1.TButton')
+    btn_data_filter.configure(style='MyButton2.TButton')
 
 
 def validate_criterion(input):
@@ -325,7 +417,7 @@ def validate_criterion(input):
             op = input[0]
             value = input[1:]
     else:
-        print('char1 `value is text')
+        print('char1 value is text')
         op = '=='
         value = input[op_end + 1:]
 
@@ -354,24 +446,9 @@ def data_unfilter(win, df):
     win.insert('1.0', dfresult)
     win.tag_add('cyanbkg', '1.0', '1.end')
 
-
-def line_plot_ORIG(df: pd.DataFrame,
-              xcol: str,
-              ycol: tk.StringVar) -> None:
-    """Create line plot (the default) for input df."""
-
-    ydata = ycol.get()
-    dfsort = df.sort_values(by=ydata)
-
-    print('line_plot params:')
-    print(f'   xcol: {xcol}')
-    print(f'   ycol: {ycol} = {ydata}')
-    print()
-
-    # ? use df.plot.line for clarity
-    # df.plot(x=xcol, y=ydata)
-    dfsort.plot(x=xcol, y=ydata)
-    plt.show()
+    # update buttons to reflect filter/no filter
+    btn_data_unfilter.config(style = 'MyButton2.TButton')
+    btn_data_filter.config(style = 'MyButton1.TButton')
 
 
 def line_plot(df: pd.DataFrame,
@@ -418,7 +495,6 @@ def bar_plot(df: pd.DataFrame,
 #     return list(catlist_raw.split(', '))
     
 
-
 def scatter_plot(df: pd.DataFrame, 
                  x_variable: tk.StringVar,
                  y_variable: tk.StringVar) -> None:
@@ -429,23 +505,17 @@ def scatter_plot(df: pd.DataFrame,
     df2 = pd.DataFrame(df)
     plot_data = None
 
-
-
-    # source['x'] = x_variable.get()
-    # source['y'] = y_variable.get()
-
     source = {'x': x_variable.get(),
               'y': y_variable.get()}
-    print(f"source x,y: {source['x']}, {source['y']}")
-
+    # print(f"source x,y: {source['x']}, {source['y']}")
 
     category = category_lb.get(category_lb.curselection())
 
     catlist = plotui.category_values
 
-    print('in scatter plot, got these:')
-    print(f'   category: {category}')
-    print(f'   catlist: {catlist}')
+    # print('in scatter plot, got these:')
+    # print(f'   category: {category}')
+    # print(f'   catlist: {catlist}')
 
     def create_plot(data, cat):
         data.plot.scatter(x=source['x'],
@@ -478,6 +548,7 @@ root.title = 'myocardial strain'
 # Style objects will be added later.
 # style = ttk.Style()
 # style.configure('MyCheckbutton.TCheckbutton', foreground='black')
+styles_ttk.CreateStyles()
 
 # print(f'pandas library: {pd.__version__}')
 # print(f'pandas dependencies: {pd.show_versions()}')
@@ -494,12 +565,12 @@ output_win.pack(padx=10, pady=10, fill='x', expand=True)
 data_columns = ["gender", "age", "TID", "stress EF", "rest EF"]
 line_data_source = 'age'
 bar_data_source = 'TID'
-# scatter_data_source = {'x': 'age',
-                    #    'y': 'TID'}
+
 output_win.tag_configure("cyanbkg", background="cyan")
 output_win.tag_configure("yellowbkg", background="yellow")
 
 # for scatter plot
+# is this needed?
 use_category = False
 
 
@@ -511,13 +582,6 @@ data_1 = clean_column_names(data_1)
 
 # TODO: update data_columns with the cleaned version
 data_columns = list(data_1.columns)
-
-# debug
-# print(f'data_columns:\n{data_columns}')
-# print(f'data_columns[2:]:\n{data_columns[2:]}')
-
-# print(f'column age:\n{data_1.sort_values(by=["age"])}')
-# END debug
 
 output_win.insert('1.0', data_1)
 output_win.tag_add('cyanbkg', '1.0', '1.end')
@@ -531,12 +595,11 @@ filter_frame = ttk.Frame(filter_ui, border=2, relief='groove')
 filter_label = ttk.Label(filter_frame, text='show data:')
 filter_label.pack(side='left')
 
-btn_apply_filter = ttk.Button(filter_frame,
+btn_data_filter = ttk.Button(filter_frame,
                         text='filter:',
                         command=lambda w=output_win: data_filter(w))
-                                    #    col=filter_column: data_filter(w, col))
-                                    #    : data_filter(w, col))
-btn_apply_filter.pack(side='left', padx=5, pady=10)
+
+btn_data_filter.pack(side='left', padx=5, pady=10)
 
 filter_spec_frame = tk.Frame(filter_frame, border=4, bg='yellow')
 filter_spec_frame.pack(side='left', padx=10, pady=10)
@@ -546,7 +609,8 @@ filt_vars = []
 criterion_vars = []
 filt_cboxes = []
 filt_entries = []
-filt_buttons = []
+filt_buttons_add = []
+filt_buttons_subt = []
 
 for r in range(len(data_columns)):
     rowframe = tk.Frame(filter_spec_frame, border=2, bg='cyan')
@@ -563,27 +627,48 @@ for r in range(len(data_columns)):
     criterion = tk.StringVar()    
     entry = ttk.Entry(rowframe, width=7, textvariable=criterion)
 
-    button = ttk.Button(rowframe,
-                        text='+',
-                        width=1,
-                        command=lambda d=r + 1: add_criterion_row(d))
+    button_subt = ttk.Button(rowframe,
+                             text='-',
+                             width=1,
+                            #  command=lambda d=r: remove_criterion_row(d))
+                             command=lambda rf=rowframe: remove_criterion_row(rf))
+
+    button_add = ttk.Button(rowframe,
+                            text='+',
+                            width=1,
+                            command=lambda d=r + 1: add_criterion_row(d))
     
+    # try 03-15-2024
+    # rowframe.columnconfigure(0, weight=1)
+    # rowframe.columnconfigure(1, weight=1)
+    # rowframe.columnconfigure(2, weight=1)
+    # rowframe.columnconfigure(3, weight=1)
+    rowframe.rowconfigure(r, weight=1)
+
     filt_rows.append(rowframe)
     filt_cboxes.append(filt_cb)
     filt_entries.append(entry)
-    filt_buttons.append(button)
+    filt_buttons_subt.append(button_add)
+    filt_buttons_add.append(button_add)
 
     filt_vars.append(var)
     criterion_vars.append(criterion)
 
     filt_cb.grid(row=r, column=0)
     entry.grid(row=r, column=1)
-    button.grid(row=r, column=2)
+    button_subt.grid(row=r, column=2)
+    button_add.grid(row=r, column=3)
 
-filt_rows[0].grid(row=0, column=0)
+# filt_rows[0].grid(row=0, column=0, sticky='w')
+filt_rows[0].grid(row=0, column=0, sticky='nw')
+
+# print(f'filt_rows[0] grid info: {filt_rows[0].grid_info()}')
+# print(f'filt_rows[1] grid info: {filt_rows[1].grid_info()}')
+# print(f'   items: {filt_rows[1].grid_info().items}')
 
 btn_data_unfilter = ttk.Button(filter_ui,
                         text='all data',
+                        style='MyButton2.TButton',
                         command=lambda w=output_win, d=data_1: data_unfilter(w, d))
 btn_data_unfilter.pack(side='bottom', pady=10)
 
@@ -602,7 +687,6 @@ line_data_y = tk.StringVar()
 
 btn_line_plot = ttk.Button(plotting_main,
                   text='Line plot',
-                #   command=lambda df=data_1, x=data_columns[0], y=line_data: line_plot(df, x, y))
                   command=lambda df=data_1, x=line_data_x, y=line_data_y: line_plot(df, x, y))
 
 frame_line_x = plotui.FramedCombo(plotting_main,
@@ -673,7 +757,8 @@ category_lb= tk.Listbox(frame_scatter_basic,
 category_lb.bind('<<ListboxSelect>>', set_category)
 category_lb.select_set(0)
 
-# alternate way to load values to the Listbox category_lb
+# alternate way to load values to the Listbox category_lb. This may be the
+# only way to number the list items.
 # for ind, val in enumerate(category_list):
 #     category_lb.insert(ind, val)
 
@@ -688,53 +773,9 @@ do_category_chkb.grid(row=0, column=0, padx=5, sticky='w')
 
 category_lb.grid(row=1, column=0, padx=5, pady=10, sticky='w')
 
-# label_cat_list.grid(row=2, column=0, padx=5, sticky='w')
-# category_values_ent.grid(row=3, column=0, padx=5, pady=5, sticky='w')
 label_cat_list.grid(row=0, column=1, padx=5, sticky='w')
 category_values_ent.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
-# Scatter plot radio buttons ----------
-# radiob_xframe = tk.Frame(plotting_main,
-#                          border=4,
-#                          name='scatter_x')
-
-# label_x = tk.Label(plotting_main,
-#                    text='Plot X',
-#                    relief='groove',
-#                    borderwidth=2,
-#                    font=('Arial', 12, 'bold'))
-
-# ? value of the container attribute (defaults to root)
-# xplot = tk.StringVar(value='age')
-
-# radiob_yframe = tk.Frame(plotting_main,
-#                          border=4,
-#                          name='scatter_y')
-
-# label_y = tk.Label(plotting_main,
-#                    text='Plot Y',
-#                    relief='groove',
-#                    borderwidth=2,
-#                    font=('Arial', 12, 'bold'))
-
-# ? value of the container attribute (defaults to root)
-# yplot = tk.StringVar(value='TID')
-
-# for i in data_columns:
-#     radiobutx = tk.Radiobutton(radiob_xframe,
-#                               text=i, value=i,
-#                               variable=xplot,
-#                               command=lambda x=xplot: scatter_select_x(x))
-#     radiobutx.pack(anchor='w', padx=5)
-
-#     radiobuty = tk.Radiobutton(radiob_yframe,
-#                               text=i, value=i,
-#                               variable=yplot,
-#                               command=lambda y=yplot: scatter_select_y(y))
-#     radiobuty.pack(anchor='w', padx=5)
-# ----------- END radio buttons
-
-# new ui
 scatter_x_fr = plotui.FramedCombo(plotting_main,
                                cb_values=data_columns,
                                name='x data',
@@ -751,22 +792,11 @@ scatter_y_fr = plotui.FramedCombo(plotting_main,
 # grid the plotting UI
 # --------------------
 btn_line_plot.grid(row=0, column=0, padx=5, pady=10, sticky=tk.W)
-
-# frame_cb1.grid(row=0, column=1)
-
 btn_bar_plot.grid(row=1, column=0, padx=5, pady=10, sticky=tk.W)
-# frame_cb2.grid(row=1, column=1)
-
 btn_scatter_plot.grid(row=2, column=0, padx=5, pady=10, sticky=tk.W)
-# label_x.grid(row=2, column=2)
-# label_y.grid(row=2, column=3)
-
 frame_scatter_basic.grid(row=3, column=0, columnspan=3, padx=5, pady=10)
-# radiob_xframe.grid(row=3, column=2)
-# radiob_yframe.grid(row=3, column=3)
 
 plotting_main.pack(padx=5, pady=5)
-
 
 btnq = ttk.Button(root, text='Quit', command=root.destroy)
 btnq.pack(fill='x', padx=10, pady=10)
