@@ -62,6 +62,8 @@ history:
             Remove old radio button definition to a textfile to document how
             it was done.
 03-10-2024  Debug add/delete filter row.
+03-18-2024  Finish debug of add/delete filter row. Add window to display result
+            of analysis (summary stats, stored query string, etc.)
 
 TODO:
     - use tkinter.font to control multiple Labels, and the '+' character
@@ -149,77 +151,74 @@ def set_category_value_list(ev):
     print()
 
 
-def add_criterion_row(n):
+def create_criterion_row():
+    nextrowframe = tk.Frame(filter_spec_frame, border=2, bg='cyan')
+
+    var = tk.StringVar()
+    filt_cb = ttk.Combobox(nextrowframe, height=3, width=7,
+                           exportselection=False,
+                           state="readonly",
+                        #    name="item" + str(r),
+                           textvariable=var,
+                           values=data_columns)
+
+    filt_cb.bind('<<ComboboxSelected>>', select_filter_column)
+
+    criterion = tk.StringVar()    
+    entry = ttk.Entry(nextrowframe, width=7, textvariable=criterion)
+
+    button_subt = ttk.Button(nextrowframe,
+                             text='-',
+                             width=1,
+                            #  command=lambda d=r: remove_criterion_row(d))
+                             command=lambda rf=nextrowframe: remove_criterion_row(rf))
+
+    button_add = ttk.Button(nextrowframe,
+                            text='+',
+                            width=1,
+                            # command=lambda d=r + 1: add_criterion_row(d))
+                            command=lambda: add_criterion_row())
+    
+    # filt_rows.append(nextrowframe)
+    # filt_cboxes.append(filt_cb)
+    # filt_entries.append(entry)
+    # filt_buttons_subt.append(button_add)
+    # filt_buttons_add.append(button_add)
+
+    # filt_vars.append(var)
+    # criterion_vars.append(criterion)
+
+    filt_cb.grid(row=0, column=0)
+    entry.grid(row=0, column=1)
+    button_subt.grid(row=0, column=2)
+    button_add.grid(row=0, column=3)
+    button_add.configure
+
+    return nextrowframe
+
+
+def add_criterion_row():
     """Add a row of widgets to define a filter criterion."""
 
-    print(f'add row')
-
     rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
     num_gridded = len(rows_gridded)
-    print('rows on grid:')
+    print(f'adding row (filt_rows: {len(filt_rows)})')
+    print(f'   {num_gridded} rows on grid:')
     for r in rows_gridded:
         print(f'   {r}')
-    if num_gridded == len(filt_rows):
+
+    if num_gridded == len(data_columns):
         return
 
-    rows_not_gridded = [r for r in filt_rows if len(r.grid_info().items()) == 0]
-    num_not_gridded = len(rows_not_gridded)
-    print('rows not on grid:')
-    for r in rows_not_gridded:
-        print(f'   {r}')
+    newrow = create_criterion_row()
+    print(f'   ...adding row {newrow}')
+    filt_rows.append(newrow)
+    newrow.grid(row=num_gridded, column=0, sticky='nw')
 
-    print('   removing all "+"')
-    for r in filt_rows[0:n]:
-        r.winfo_children()[3].grid_remove()
-
-    rows_not_gridded[0].grid(row=n, column=0, sticky='nw')
-
-    print(f'   adding "+" for row {rows_not_gridded[0]}')
-    rows_not_gridded[0].winfo_children()[3].grid(row=n, column=3, sticky='w')
-
-    print()
-
-
-def ORIG_remove_criterion_row(n):
-    """Remove a row of widgets for a filter criterion.
-    
-       Data is automatically re-filtered by the remaining criteria.
-    """
-    print(f'remove row {n}:')
-    rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
-    num_gridded = len(rows_gridded)
-    print(f'   rows on grid: {num_gridded}')
-
-    if num_gridded == 1:
-        return
-    
-    # clear filter for the row
-    # print(f'   clearing filter for row {n}')
-    filt_cboxes[n].set('')
-    filt_entries[n].delete(0, tk.END)
-
-    # don't remove the only row
-    # if num_gridded > 1:
-    print(f'   removing row {n}')
-    filt_rows[n].grid_remove()
-    # num_gridded -= 1
-    
-    rows_now_gridded = [r for r in rows_gridded if len(r.grid_info().items()) > 0]
-    num_now_gridded = len(rows_now_gridded)
-
-    # reset display of '-' and '+' buttons
-    print('   removing all "+"')
-    for row in rows_now_gridded:
-        # print(f'row filt {row.winfo_children()[0].get()}')
+    for row in rows_gridded:
         row.winfo_children()[3].grid_remove()
 
-    print(f'   adding "+" for row {num_now_gridded - 1}')
-    print(f'      filt_vars is {filt_vars[num_now_gridded].get()}')
-    # print(f'      cb set to {rows_now_gridded[-1].winfo_children()[0].get()}')
-    # rows_now_gridded[-1].winfo_children()[3].grid(row=num_now_gridded - 1, column=3, sticky='w')
-    rows_now_gridded[-1].winfo_children()[3].grid(row=num_now_gridded, column=3, sticky='w')
     print()
-    data_filter(output_win)
 
 
 def remove_criterion_row(n):
@@ -229,9 +228,9 @@ def remove_criterion_row(n):
     """
     rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
     num_gridded = len(rows_gridded)
-    print('rows on grid:')
-    for r in rows_gridded:
-        print(f'   {r}')
+    # print('rows on grid:')
+    # for r in rows_gridded:
+    #     print(f'   {r}')
 
     if num_gridded == 1:
         return
@@ -244,8 +243,7 @@ def remove_criterion_row(n):
 
     # don't remove the only row
     print(f'removing row {n}')
-    # filt_rows[n].grid_remove()
-    rows_gridded[-2].winfo_children()[3].grid(row=num_gridded - 2, column=3, sticky='nw')
+    filt_rows.remove(n)
     n.grid_remove()
     
     rows_now_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
@@ -254,24 +252,19 @@ def remove_criterion_row(n):
     print(f'rows now on grid: {num_now_gridded}')
     for index, r in enumerate(rows_now_gridded):
         print(f'   {r}')
-        r.rowconfigure(index, weight=1)
+        # r.rowconfigure(index, weight=1)
 
+    # rows_now_gridded[-1].winfo_children()[3].grid(row=index - 1, column=3, sticky='nw')
 
-    # re-configure the grid for the current rows
-    # for index, row in enumerate(rows_now_gridded):
-    #     print(f'   index {index}, row {row}')
-    #     row.grid(row=index, column=0, sticky='nw')
-
-        # row.winfo_children()[3].grid_remove()
-    
     # print(f'   adding "+" for row {rows_now_gridded[-1]}')
-    # rows_now_gridded[-1].winfo_children()[3].grid(row=num_now_gridded, column=3, sticky='nw')
+    rows_now_gridded[-1].winfo_children()[3].grid(row=0, column=3, sticky='nw')
 
     print()
+
     data_filter(output_win)
 
 
-# Not used. Might be used to construct a string to document the filter
+# NOT USED. Might be used to construct a string to document the filter
 # e.g. for exporting the filtered list.
 def select_filter_column(ev):
     """Read Combobox to get item for data filter."""
@@ -329,20 +322,26 @@ def data_filter(win):
     quote = ''
     q_expression = ''
 
-    for i in range(len(data_columns)):
+    # for i in range(len(data_columns)):
+    for i in range(len(filt_rows)):
         """Another method, instead of of query, is to use a series of 
         terms like: df[col] > 55. This doesn't require cleaning col names.
         """
         current_term = ''
-        if filt_vars[i].get() != '' and criterion_vars[i].get() != '':
+        print(f'row {i}:')
+        print(f'    {filt_rows[i]}')
+        this_filter = filt_rows[i].winfo_children()[0].get()
+        this_criterion = filt_rows[i].winfo_children()[1].get()
+        print(f'filt, crit: {this_filter}, {this_criterion}')
 
-            dcolumn.append(filt_vars[i].get())
-            criteria.append(criterion_vars[i].get())
+        # if filt_vars[i].get() != '' and criterion_vars[i].get() != '':
+        if this_filter != '' and this_criterion != '':
 
-            # print(f'i is: {i}')
-            # print(f'...filt: {filt_vars[i].get()}, criterion: {criterion_vars[i].get()}')
-            # print()
-            # print(f'...criteria list: {criteria}')
+            # dcolumn.append(filt_vars[i].get())
+            # criteria.append(criterion_vars[i].get())
+            dcolumn.append(this_filter)
+            criteria.append(this_criterion)
+
             # print()
 
             current_criterion = len(criteria) - 1
@@ -558,13 +557,15 @@ output_win = tk.Text(root, width=50, height=15,
                      foreground='black',
                      borderwidth=2,
                      relief='sunken', name='datawin')
-output_win.pack(padx=10, pady=10, fill='x', expand=True)
+output_win.pack(padx=10, pady=5, fill='x', expand=True)
 
 
 # ---------- module scope objects
 data_columns = ["gender", "age", "TID", "stress EF", "rest EF"]
 line_data_source = 'age'
 bar_data_source = 'TID'
+x_text = 'x'
+y_text = 'y'
 
 output_win.tag_configure("cyanbkg", background="cyan")
 output_win.tag_configure("yellowbkg", background="yellow")
@@ -587,16 +588,66 @@ output_win.insert('1.0', data_1)
 output_win.tag_add('cyanbkg', '1.0', '1.end')
 
 
+
 # ---------- UI for filtered data display
 filter_ui = ttk.Frame(root, border=2, relief='raised')
 
 filter_frame = ttk.Frame(filter_ui, border=2, relief='groove')
 
-filter_label = ttk.Label(filter_frame, text='show data:')
-filter_label.pack(side='left')
+# filter_label = ttk.Label(filter_frame, text='show data:')
+# filter_label.pack(anchor='w')
+
+filter_label = ttk.Label(filter_ui, text='statistics:')
+filter_label.pack(anchor='w', fill='x')
+
+stat_win = tk.Text(filter_ui, width=50, height=3,
+                     background='beige',
+                     foreground='black',
+                     font=('Courier New', 14),
+                     borderwidth=2,
+                     relief='sunken', name='filterwin')
+stat_win.pack(padx=10, fill='x', expand=True)
+
+stat_win.tag_configure('fontbold', font=('Courier', 14, 'bold'))
+
+
+# statistics ----------
+plusminus = u'\u00B1'
+age_mean = format(data_1["age"].mean(), '.2f')
+age_std = format(data_1["age"].std(), '.2f')
+age_string = ' '.join(['age:', age_mean, plusminus, age_std])
+
+# print(f'cols: {data_1.columns}')
+
+# make a list of numeric fields (columns)
+numeric_cols = []
+for c in data_1.columns:
+    if data_1[c].dtype == 'int64' or data_1[c].dtype == 'float64':
+        numeric_cols.append(c)
+
+# construct text strings and add each row to the Text
+# for index, c in enumerate(data_1.columns):
+for index, c in enumerate(numeric_cols):
+    # print(f'   {c}, {len(c)}, {data_1[c].dtype}')
+    thistype = data_1[c].dtype
+    if thistype == 'int64' or thistype == 'float64':
+        s = c + ':'
+        hlstart = str(format(index, '.1f'))
+        stat_str = ' '.join([s, age_mean, plusminus, age_std])
+        print()
+        # print(f'stat_str: {stat_str}')
+        # print(f'{c} at: {hlstart}, {hlend}')
+        # stat_win.insert(tk.INSERT, stat_str)
+        stat_win.insert(hlstart, stat_str + "\n")
+        
+        wend = hlstart + ' wordend'
+        stat_win.tag_add('fontbold', hlstart, wend)
+        
+stat_win.configure(state='disabled')
+
 
 btn_data_filter = ttk.Button(filter_frame,
-                        text='filter:',
+                        text='criteria:',
                         command=lambda w=output_win: data_filter(w))
 
 btn_data_filter.pack(side='left', padx=5, pady=10)
@@ -612,54 +663,54 @@ filt_entries = []
 filt_buttons_add = []
 filt_buttons_subt = []
 
-for r in range(len(data_columns)):
-    rowframe = tk.Frame(filter_spec_frame, border=2, bg='cyan')
-    var = tk.StringVar()
-    filt_cb = ttk.Combobox(rowframe, height=3, width=7,
-                           exportselection=False,
-                           state="readonly",
-                           name="item" + str(r),
-                           textvariable=var,
-                           values=data_columns)
+# for r in range(len(data_columns)):
+    # rowframe = tk.Frame(filter_spec_frame, border=2, bg='cyan')
+    # var = tk.StringVar()
+    # filt_cb = ttk.Combobox(rowframe, height=3, width=7,
+    #                        exportselection=False,
+    #                        state="readonly",
+    #                        name="item" + str(r),
+    #                        textvariable=var,
+    #                        values=data_columns)
 
-    filt_cb.bind('<<ComboboxSelected>>', select_filter_column)
+    # filt_cb.bind('<<ComboboxSelected>>', select_filter_column)
 
-    criterion = tk.StringVar()    
-    entry = ttk.Entry(rowframe, width=7, textvariable=criterion)
+    # criterion = tk.StringVar()    
+    # entry = ttk.Entry(rowframe, width=7, textvariable=criterion)
 
-    button_subt = ttk.Button(rowframe,
-                             text='-',
-                             width=1,
-                            #  command=lambda d=r: remove_criterion_row(d))
-                             command=lambda rf=rowframe: remove_criterion_row(rf))
+    # button_subt = ttk.Button(rowframe,
+    #                          text='-',
+    #                          width=1,
+    #                         #  command=lambda d=r: remove_criterion_row(d))
+    #                          command=lambda rf=rowframe: remove_criterion_row(rf))
 
-    button_add = ttk.Button(rowframe,
-                            text='+',
-                            width=1,
-                            command=lambda d=r + 1: add_criterion_row(d))
-    
-    # try 03-15-2024
-    # rowframe.columnconfigure(0, weight=1)
-    # rowframe.columnconfigure(1, weight=1)
-    # rowframe.columnconfigure(2, weight=1)
-    # rowframe.columnconfigure(3, weight=1)
-    rowframe.rowconfigure(r, weight=1)
+    # button_add = ttk.Button(rowframe,
+    #                         text='+',
+    #                         width=1,
+    #                         # command=lambda d=r + 1: add_criterion_row(d))
+    #                         command=add_criterion_row())
+rowframe = create_criterion_row()
 
-    filt_rows.append(rowframe)
-    filt_cboxes.append(filt_cb)
-    filt_entries.append(entry)
-    filt_buttons_subt.append(button_add)
-    filt_buttons_add.append(button_add)
+# print(f'cb     filt: {rowframe.winfo_children()[0]}')
+# print(f'entry  crit: {rowframe.winfo_children()[1]}')
+# print(f'button -: {rowframe.winfo_children()[2]}')
+# print(f'button +: {rowframe.winfo_children()[3]}')
+filt_rows.append(rowframe)
 
-    filt_vars.append(var)
-    criterion_vars.append(criterion)
+filt_cboxes.append(rowframe.winfo_children()[0])
+filt_entries.append(rowframe.winfo_children()[1])
+filt_buttons_subt.append(rowframe.winfo_children()[2])
+filt_buttons_add.append(rowframe.winfo_children()[3])
 
-    filt_cb.grid(row=r, column=0)
-    entry.grid(row=r, column=1)
-    button_subt.grid(row=r, column=2)
-    button_add.grid(row=r, column=3)
+    # filt_vars.append(var)
+    # criterion_vars.append(criterion)
 
-# filt_rows[0].grid(row=0, column=0, sticky='w')
+    # filt_cb.grid(row=r, column=0)
+    # entry.grid(row=r, column=1)
+    # button_subt.grid(row=r, column=2)
+    # button_add.grid(row=r, column=3)
+
+
 filt_rows[0].grid(row=0, column=0, sticky='nw')
 
 # print(f'filt_rows[0] grid info: {filt_rows[0].grid_info()}')
@@ -691,13 +742,13 @@ btn_line_plot = ttk.Button(plotting_main,
 
 frame_line_x = plotui.FramedCombo(plotting_main,
                                   cb_values=data_columns,
-                                  name='x data',
+                                  name=x_text,
                                   var=line_data_x,
                                   posn=[0,1])
 
 frame_line_y = plotui.FramedCombo(plotting_main,
                                   cb_values=data_columns[2:],
-                                  name='y data',
+                                  name=y_text,
                                   var=line_data_y,
                                   posn=[0,2])
 
@@ -712,13 +763,13 @@ btn_bar_plot = ttk.Button(plotting_main,
 
 frame_bar_x = plotui.FramedCombo(plotting_main,
                                cb_values=data_columns,
-                               name='x data',
+                               name=x_text,
                                var=bar_data_x,
                                posn=[1,1])
 
 frame_bar_y = plotui.FramedCombo(plotting_main,
                                cb_values=data_columns[1:],
-                               name='y data',
+                               name=y_text,
                                var=bar_data_y,
                                posn=[1,2])
 
@@ -778,13 +829,13 @@ category_values_ent.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
 scatter_x_fr = plotui.FramedCombo(plotting_main,
                                cb_values=data_columns,
-                               name='x data',
+                               name=x_text,
                                var=scatter_x,
                                posn=[2,1])
 
 scatter_y_fr = plotui.FramedCombo(plotting_main,
                                cb_values=data_columns[1:],
-                               name='y data',
+                               name=y_text,
                                var=scatter_y,
                                posn=[2,2])
 
