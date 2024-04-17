@@ -12,6 +12,8 @@ history:
 03-03-2024  Add create_widgets() to FramedCombo class. Pass in label value.
 03-04-2024  Use **kwargs for FramedCombo class.
 03-05-2024  Append separator character(s) to Label.
+04-16-2024  Remove unused variables. Rename 'category_values' to 'value_list'
+            to make this module more generic.
 """
 
 import sys
@@ -20,9 +22,7 @@ from tkinter import ttk
 
 this = sys.modules[__name__]
 
-this.use_category = False
-this.category = None
-this.category_values = None
+this.value_list = None
 
 class MyEntry(ttk.Entry):
     def __init__(self, parent, **kwargs):
@@ -35,7 +35,7 @@ class MyEntry(ttk.Entry):
         rawlist = self.get()
         # print(f'from my, rawlist: {rawlist}')
 
-        this.category_values = list(rawlist.split(', '))
+        this.value_list = list(rawlist.split(', '))
 
 
 

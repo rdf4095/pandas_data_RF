@@ -64,6 +64,12 @@ history:
 03-10-2024  Debug add/delete filter row.
 03-18-2024  Finish debug of add/delete filter row. Add window to display result
             of analysis (summary stats, stored query string, etc.)
+04-06-2024  Add window for numeric data.
+            Add vertical scrollbar (not working.) Delete old code.
+04-09-2024  Add scrollbar to stats window. Update parent Frame.
+04-11-2024  Rename output_win to data_win.
+04-16-2024  Change to rectangular root layout, using .grid(). Add Label to the
+            main data ¸ui.
 
 TODO:
     - use tkinter.font to control multiple Labels, and the '+' character
@@ -73,6 +79,7 @@ TODO:
       reading this by replacing the button's command attribute
       with a bind().
     - There is a mixture of tk and ttk widgets. ? consistency.
+    - re-order the code for scatter plots, rename the top Frame for this section.
 """
 
 import tkinter as tk
@@ -82,6 +89,8 @@ from tkinter import ttk
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+
+# is this a builtin?
 from importlib.machinery import SourceFileLoader
 
 import plotting_ui as plotui
@@ -192,6 +201,8 @@ def create_criterion_row():
     entry.grid(row=0, column=1)
     button_subt.grid(row=0, column=2)
     button_add.grid(row=0, column=3)
+
+    # what is this?
     button_add.configure
 
     return nextrowframe
@@ -261,7 +272,7 @@ def remove_criterion_row(n):
 
     print()
 
-    data_filter(output_win)
+    data_filter(data_win)
 
 
 # NOT USED. Might be used to construct a string to document the filter
@@ -427,6 +438,7 @@ def validate_criterion(input):
     return criterion
     
 
+# NOT USED
 def validate_term(t):
     """Future: Make a reasonable guess about ambiguous filter entry.
      
@@ -510,7 +522,7 @@ def scatter_plot(df: pd.DataFrame,
 
     category = category_lb.get(category_lb.curselection())
 
-    catlist = plotui.category_values
+    catlist = plotui.value_list
 
     # print('in scatter plot, got these:')
     # print(f'   category: {category}')
@@ -543,7 +555,6 @@ def scatter_plot(df: pd.DataFrame,
 root = tk.Tk()
 root.title = 'myocardial strain'
 
-
 # Style objects will be added later.
 # style = ttk.Style()
 # style.configure('MyCheckbutton.TCheckbutton', foreground='black')
@@ -551,13 +562,6 @@ styles_ttk.CreateStyles()
 
 # print(f'pandas library: {pd.__version__}')
 # print(f'pandas dependencies: {pd.show_versions()}')
-
-output_win = tk.Text(root, width=50, height=15,
-                     background='beige',
-                     foreground='black',
-                     borderwidth=2,
-                     relief='sunken', name='datawin')
-output_win.pack(padx=10, pady=5, fill='x', expand=True)
 
 
 # ---------- module scope objects
@@ -567,88 +571,119 @@ bar_data_source = 'TID'
 x_text = 'x'
 y_text = 'y'
 
-output_win.tag_configure("cyanbkg", background="cyan")
-output_win.tag_configure("yellowbkg", background="yellow")
-
 # for scatter plot
-# is this needed?
+# NOT USED... needed?
 use_category = False
 
 
-# ---------- Read and display the dataset
-# ("1.0 lineend" also works for end-of-line)
+# ---------- Read the dataset
 data_1 = pd.read_csv('data/strain_nml_sample.csv')
 
 data_1 = clean_column_names(data_1)
 
-# TODO: update data_columns with the cleaned version
 data_columns = list(data_1.columns)
 
-output_win.insert('1.0', data_1)
-output_win.tag_add('cyanbkg', '1.0', '1.end')
+
+# Data UI
+# =======
+data_ui = ttk.Frame(root, border=2, relief='raised')
+
+data_label = ttk.Label(data_ui, text='data:')
+data_label.pack(anchor='w')
+
+data_win = tk.Text(data_ui, width=50, height=15,
+                   background='beige',
+                   foreground='black',
+                   borderwidth=2,
+                   relief='sunken',
+                   name='datawin')
+
+data_win.tag_configure("cyanbkg", background="cyan")
+data_win.tag_configure("yellowbkg", background="yellow")
+
+data_win.pack(padx=10, pady=5, fill='x', expand=True)
+
+data_win.insert('1.0', data_1)
+# ("1.0 lineend" also works for end-of-line)
+data_win.tag_add('cyanbkg', '1.0', '1.end')
+
+data_scroll = ttk.Scrollbar(data_ui, orient='vertical', command=data_win.yview)
+data_win.pack(side='left', pady=5, fill='x', expand=True)
+data_scroll.pack(side='right', fill='y', pady=5)
+# data_ui.pack(padx=5, pady=5, side='left', fill='both')
+data_win['yscrollcommand'] = data_scroll.set
 
 
+# Statistics UI
+# =============
+# plusminus = u'\u00B1'
 
-# ---------- UI for filtered data display
-filter_ui = ttk.Frame(root, border=2, relief='raised')
+stat_ui = ttk.Frame(root, border=2, relief='raised')
+stat_label = ttk.Label(stat_ui, text='statistics:')
+stat_label.pack(anchor='w')
 
-filter_frame = ttk.Frame(filter_ui, border=2, relief='groove')
-
-# filter_label = ttk.Label(filter_frame, text='show data:')
-# filter_label.pack(anchor='w')
-
-filter_label = ttk.Label(filter_ui, text='statistics:')
-filter_label.pack(anchor='w', fill='x')
-
-stat_win = tk.Text(filter_ui, width=50, height=3,
+stat_win = tk.Text(stat_ui, width=50, height=7,
                      background='beige',
                      foreground='black',
                      font=('Courier New', 14),
                      borderwidth=2,
-                     relief='sunken', name='filterwin')
-stat_win.pack(padx=10, fill='x', expand=True)
+                     relief='sunken', name='statwin')
 
-stat_win.tag_configure('fontbold', font=('Courier', 14, 'bold'))
+stat_scroll = ttk.Scrollbar(stat_ui, orient='vertical', command=stat_win.yview)
+stat_win.pack(side='left', pady=5, fill='x', expand=True)
+stat_scroll.pack(side='right', fill='y', pady=5)
+stat_win['yscrollcommand'] = stat_scroll.set
 
+# stat_ui.pack(padx=5, pady=5, side='left', fill='both')
 
-# statistics ----------
-plusminus = u'\u00B1'
-age_mean = format(data_1["age"].mean(), '.2f')
-age_std = format(data_1["age"].std(), '.2f')
-age_string = ' '.join(['age:', age_mean, plusminus, age_std])
+# for a good summary of skew and kurtosis, see medium.com
+stat_list = ['mean', 'std', 'min', 'median', 'max', 'skew', 'kurtosis']
 
-# print(f'cols: {data_1.columns}')
-
-# make a list of numeric fields (columns)
-numeric_cols = []
+stats_dict = {}
 for c in data_1.columns:
     if data_1[c].dtype == 'int64' or data_1[c].dtype == 'float64':
-        numeric_cols.append(c)
+        # numeric_cols.append(c)
+        stats_dict[c] = stat_list
 
-# construct text strings and add each row to the Text
-# for index, c in enumerate(data_1.columns):
-for index, c in enumerate(numeric_cols):
-    # print(f'   {c}, {len(c)}, {data_1[c].dtype}')
-    thistype = data_1[c].dtype
-    if thistype == 'int64' or thistype == 'float64':
-        s = c + ':'
-        hlstart = str(format(index, '.1f'))
-        stat_str = ' '.join([s, age_mean, plusminus, age_std])
-        print()
-        # print(f'stat_str: {stat_str}')
-        # print(f'{c} at: {hlstart}, {hlend}')
-        # stat_win.insert(tk.INSERT, stat_str)
-        stat_win.insert(hlstart, stat_str + "\n")
-        
-        wend = hlstart + ' wordend'
-        stat_win.tag_add('fontbold', hlstart, wend)
-        
+stats_agg = data_1.agg(
+    stats_dict
+)
+
+# Format floating point values
+# method 1: format for display but don't change the DataFrame
+with pd.option_context('display.float_format', '{:0.2f}'.format):
+    stat_win.insert('1.0', stats_agg)
+
+# method 2: create a new DataFrame with formatted values
+# stats_agg_format = stats_agg.map('{:0.2f}'.format)
+# stat_win.insert('1.0', stats_agg_format)
+
+# method 3: use the default styler object
+# TODO
+
+stat_win.tag_configure("bolded", font=('Courier New', 14, 'bold'))
+stat_win.tag_add('bolded', '1.0', '1.end')
+
+for e in range(2, len(stat_list) + 2):
+    row = str(format(e, '0.1f'))
+    strend = row + ' wordend'
+    stat_win.tag_add('bolded', row, strend)
+
 stat_win.configure(state='disabled')
 
 
+# Data filtering UI
+# =================
+filter_ui = ttk.Frame(root, border=2, relief='raised')
+
+filter_frame = ttk.Frame(filter_ui, border=2, relief='groove')
+
+filter_label = ttk.Label(filter_ui, text='filter:')
+filter_label.pack(anchor='w')
+
 btn_data_filter = ttk.Button(filter_frame,
                         text='criteria:',
-                        command=lambda w=output_win: data_filter(w))
+                        command=lambda w=data_win: data_filter(w))
 
 btn_data_filter.pack(side='left', padx=5, pady=10)
 
@@ -663,32 +698,6 @@ filt_entries = []
 filt_buttons_add = []
 filt_buttons_subt = []
 
-# for r in range(len(data_columns)):
-    # rowframe = tk.Frame(filter_spec_frame, border=2, bg='cyan')
-    # var = tk.StringVar()
-    # filt_cb = ttk.Combobox(rowframe, height=3, width=7,
-    #                        exportselection=False,
-    #                        state="readonly",
-    #                        name="item" + str(r),
-    #                        textvariable=var,
-    #                        values=data_columns)
-
-    # filt_cb.bind('<<ComboboxSelected>>', select_filter_column)
-
-    # criterion = tk.StringVar()    
-    # entry = ttk.Entry(rowframe, width=7, textvariable=criterion)
-
-    # button_subt = ttk.Button(rowframe,
-    #                          text='-',
-    #                          width=1,
-    #                         #  command=lambda d=r: remove_criterion_row(d))
-    #                          command=lambda rf=rowframe: remove_criterion_row(rf))
-
-    # button_add = ttk.Button(rowframe,
-    #                         text='+',
-    #                         width=1,
-    #                         # command=lambda d=r + 1: add_criterion_row(d))
-    #                         command=add_criterion_row())
 rowframe = create_criterion_row()
 
 # print(f'cb     filt: {rowframe.winfo_children()[0]}')
@@ -702,15 +711,6 @@ filt_entries.append(rowframe.winfo_children()[1])
 filt_buttons_subt.append(rowframe.winfo_children()[2])
 filt_buttons_add.append(rowframe.winfo_children()[3])
 
-    # filt_vars.append(var)
-    # criterion_vars.append(criterion)
-
-    # filt_cb.grid(row=r, column=0)
-    # entry.grid(row=r, column=1)
-    # button_subt.grid(row=r, column=2)
-    # button_add.grid(row=r, column=3)
-
-
 filt_rows[0].grid(row=0, column=0, sticky='nw')
 
 # print(f'filt_rows[0] grid info: {filt_rows[0].grid_info()}')
@@ -718,18 +718,21 @@ filt_rows[0].grid(row=0, column=0, sticky='nw')
 # print(f'   items: {filt_rows[1].grid_info().items}')
 
 btn_data_unfilter = ttk.Button(filter_ui,
-                        text='all data',
+                        text='show all data',
                         style='MyButton2.TButton',
-                        command=lambda w=output_win, d=data_1: data_unfilter(w, d))
-btn_data_unfilter.pack(side='bottom', pady=10)
+                        command=lambda w=data_win, d=data_1: data_unfilter(w, d))
+btn_data_unfilter.pack(side='bottom', pady=5)
 
 filter_frame.pack(padx=10, pady=10, fill='both')
-filter_ui.pack(padx=5, pady=5, fill='both')
+# filter_ui.pack(padx=5, pady=5, side='right', fill='both')
 
 
 # plotting UI
 # ===========
-plotting_main = ttk.Frame(root, border=2, relief='raised')
+plot_label_fr = ttk.Frame(root, border=2, relief='raised')
+plotting_label = ttk.Label(plot_label_fr, text='plotting:')
+plotting_main = ttk.Frame(plot_label_fr)
+plotting_label.pack(anchor='w')
 
 # ---------- Line plot
 # line_data = tk.StringVar(value=data_columns[2])
@@ -762,13 +765,13 @@ btn_bar_plot = ttk.Button(plotting_main,
                   command=lambda df=data_1, x=bar_data_x, y=bar_data_y: bar_plot(df, x, y))
 
 frame_bar_x = plotui.FramedCombo(plotting_main,
-                               cb_values=data_columns,
+                               cb_values=data_columns[1:],
                                name=x_text,
                                var=bar_data_x,
                                posn=[1,1])
 
 frame_bar_y = plotui.FramedCombo(plotting_main,
-                               cb_values=data_columns[1:],
+                               cb_values=data_columns[2:],
                                name=y_text,
                                var=bar_data_y,
                                posn=[1,2])
@@ -828,13 +831,13 @@ label_cat_list.grid(row=0, column=1, padx=5, sticky='w')
 category_values_ent.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
 scatter_x_fr = plotui.FramedCombo(plotting_main,
-                               cb_values=data_columns,
+                               cb_values=data_columns[1:],
                                name=x_text,
                                var=scatter_x,
                                posn=[2,1])
 
 scatter_y_fr = plotui.FramedCombo(plotting_main,
-                               cb_values=data_columns[1:],
+                               cb_values=data_columns[2:],
                                name=y_text,
                                var=scatter_y,
                                posn=[2,2])
@@ -842,14 +845,25 @@ scatter_y_fr = plotui.FramedCombo(plotting_main,
 
 # grid the plotting UI
 # --------------------
-btn_line_plot.grid(row=0, column=0, padx=5, pady=10, sticky=tk.W)
-btn_bar_plot.grid(row=1, column=0, padx=5, pady=10, sticky=tk.W)
-btn_scatter_plot.grid(row=2, column=0, padx=5, pady=10, sticky=tk.W)
-frame_scatter_basic.grid(row=3, column=0, columnspan=3, padx=5, pady=10)
+y_spacing = 5
 
-plotting_main.pack(padx=5, pady=5)
+btn_line_plot.grid(row=0, column=0, padx=5, pady=y_spacing, sticky=tk.W)
+btn_bar_plot.grid(row=1, column=0, padx=5, pady=y_spacing, sticky=tk.W)
+btn_scatter_plot.grid(row=2, column=0, padx=5, pady=y_spacing, sticky=tk.W)
+frame_scatter_basic.grid(row=3, column=0, columnspan=3, padx=5, pady=y_spacing)
+
+plotting_main.pack(padx=5, pady=5, fill='both')
+
+# grid the main UI sections
+data_ui.grid(row=0, column=0, padx=5, pady=5, sticky='nsew')
+stat_ui.grid(row=1, column=0, padx=5, pady=5, sticky='nsew')
+filter_ui.grid(row=0, column=1, padx=5, pady=5, sticky='nsew')
+plot_label_fr.grid(row=1, column=1, padx=5, pady=5, sticky='nsew')
+
+
 
 btnq = ttk.Button(root, text='Quit', command=root.destroy)
-btnq.pack(fill='x', padx=10, pady=10)
+# btnq.pack(fill='x', padx=10, pady=10)
+btnq.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
 
 root.mainloop()
