@@ -69,7 +69,14 @@ history:
 04-09-2024  Add scrollbar to stats window. Update parent Frame.
 04-11-2024  Rename output_win to data_win.
 04-16-2024  Change to rectangular root layout, using .grid(). Add Label to the
-            main data ¸ui.
+            main data ui.
+04-19-2024  In plotting ui section, make variable names more consistent (use
+            widget name suffixes, e.g. fr = Frame.)
+04-22-2024  In filtering ui and statistics ui, revise variable names as above.
+04-27-2024  Update statistics window based on how the data is filtered. Move
+            styling of statistics window to function style_df_text. Rename
+            style tags for main data window. For scatterplot, accept category
+            value list upon mouseout of the Entry widget.
 
 TODO:
     - use tkinter.font to control multiple Labels, and the '+' character
@@ -78,22 +85,19 @@ TODO:
     - data_filter now returns -1 if the filter failed. Try
       reading this by replacing the button's command attribute
       with a bind().
-    - There is a mixture of tk and ttk widgets. ? consistency.
-    - re-order the code for scatter plots, rename the top Frame for this section.
+    - re-order functions for widget interaction, based on their order in the ui.
 """
 
 import tkinter as tk
 from tkinter import ttk
 # import tkinter.font as tkfont
+from importlib.machinery import SourceFileLoader
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# is this a builtin?
-from importlib.machinery import SourceFileLoader
-
-import plotting_ui as plotui
+import rf_custom_ui as custui
 
 styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_module()
 
@@ -102,6 +106,22 @@ styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_modu
 widget interaction functions
 ----------------------------
 """
+def style_df_text(win, itemlist):
+    """Apply text styling to pandas DataFrame (df) displayed in a Text widget.
+
+    The tag that is added is defined externally.
+    """
+    # stat_win.tag_configure("bolded", font=('Courier New', 14, 'bold'))
+    win.tag_add('bolded', '1.0', '1.end')
+
+    for e in range(2, len(itemlist) + 2):
+        row = str(format(e, '0.1f'))
+        strend = row + ' wordend'
+        win.tag_add('bolded', row, strend)
+
+    win.configure(state='disabled')
+
+
 def attend():
     """postcommand for 1 or more Combobox widgets.
     
@@ -119,9 +139,9 @@ def set_use_category(varname):
     Select a row in the corresponding Listbox.
     """
 
-    do_cat = do_category.get()
+    do_cat = use_category.get()
 
-    do_cat_test = frame_scatter_basic.getvar(name=varname)
+    do_cat_test = scatter_setup_fr.getvar(name=varname)
 
     print('in set_use_category:')
     print(f'   do_cat: {do_cat}')
@@ -142,6 +162,7 @@ def chkb_extra(ev):
 
 
 # debug: demonstrate that the value was set
+#        ...bound to ListboxSelect but never used for anything.
 def set_category(ev):
     """Listbox callback: select categorical variable (data column).
     
@@ -152,6 +173,7 @@ def set_category(ev):
 
 
 # debug: demonstrate that the value list was set
+# NOT USED
 def set_category_value_list(ev):
     """Entry callback: set the category value list."""
 
@@ -160,14 +182,13 @@ def set_category_value_list(ev):
     print()
 
 
-def create_criterion_row():
-    nextrowframe = tk.Frame(filter_spec_frame, border=2, bg='cyan')
+def create_criterion_row(datawin, statwin):
+    nextrowframe = tk.Frame(filter_spec_fr, border=2, bg='cyan')
 
     var = tk.StringVar()
     filt_cb = ttk.Combobox(nextrowframe, height=3, width=7,
                            exportselection=False,
                            state="readonly",
-                        #    name="item" + str(r),
                            textvariable=var,
                            values=data_columns)
 
@@ -179,24 +200,13 @@ def create_criterion_row():
     button_subt = ttk.Button(nextrowframe,
                              text='-',
                              width=1,
-                            #  command=lambda d=r: remove_criterion_row(d))
-                             command=lambda rf=nextrowframe: remove_criterion_row(rf))
+                             command=lambda rf=nextrowframe, d=datawin, s=statwin: remove_criterion_row(rf, d, s))
 
     button_add = ttk.Button(nextrowframe,
                             text='+',
                             width=1,
-                            # command=lambda d=r + 1: add_criterion_row(d))
                             command=lambda: add_criterion_row())
     
-    # filt_rows.append(nextrowframe)
-    # filt_cboxes.append(filt_cb)
-    # filt_entries.append(entry)
-    # filt_buttons_subt.append(button_add)
-    # filt_buttons_add.append(button_add)
-
-    # filt_vars.append(var)
-    # criterion_vars.append(criterion)
-
     filt_cb.grid(row=0, column=0)
     entry.grid(row=0, column=1)
     button_subt.grid(row=0, column=2)
@@ -232,7 +242,7 @@ def add_criterion_row():
     print()
 
 
-def remove_criterion_row(n):
+def remove_criterion_row(n, datawin, statwin):
     """Remove a row of widgets for a filter criterion.
     
        Data is automatically re-filtered by the remaining criteria.
@@ -265,18 +275,13 @@ def remove_criterion_row(n):
         print(f'   {r}')
         # r.rowconfigure(index, weight=1)
 
-    # rows_now_gridded[-1].winfo_children()[3].grid(row=index - 1, column=3, sticky='nw')
-
-    # print(f'   adding "+" for row {rows_now_gridded[-1]}')
     rows_now_gridded[-1].winfo_children()[3].grid(row=0, column=3, sticky='nw')
 
     print()
 
-    data_filter(data_win)
+    data_filter(datawin, statwin)
 
 
-# NOT USED. Might be used to construct a string to document the filter
-# e.g. for exporting the filtered list.
 def select_filter_column(ev):
     """Read Combobox to get item for data filter."""
 
@@ -286,25 +291,6 @@ def select_filter_column(ev):
     # print(f'...from {which_filt}, filt by: {val}')
     # print(f'...widget parent: {ev.widget.winfo_parent()}')
     # print()
-
-
-# NOT USED
-def scatter_select_x(x):
-    """Select X data for scatter plot."""
-
-    value = x.get()
-    # scatter_data_source['x'] = value
-    print(f'x to plot: {value}')
-
-
-# NOT USED
-def scatter_select_y(y):
-    """Select Y data for scatter plot."""
-    
-    value = y.get()
-    # scatter_data_source['y'] = value
-    print(f'y to plot: {value}')
-
 
 """ 
 --------------------------
@@ -324,7 +310,7 @@ def clean_column_names(df):
     return df
 
 
-def data_filter(win):
+def data_filter(win, statwin):
     """Display a filtered version of the original DataFrame."""
 
     dcolumn = []
@@ -339,8 +325,7 @@ def data_filter(win):
         terms like: df[col] > 55. This doesn't require cleaning col names.
         """
         current_term = ''
-        print(f'row {i}:')
-        print(f'    {filt_rows[i]}')
+
         this_filter = filt_rows[i].winfo_children()[0].get()
         this_criterion = filt_rows[i].winfo_children()[1].get()
         print(f'filt, crit: {this_filter}, {this_criterion}')
@@ -389,14 +374,33 @@ def data_filter(win):
     # print(f'q_expression string: {repr(q_expression)}')
     # print()
 
-    dfresult = data_1.query(q_expression)
-    win.delete('1.0', tk.END)
-    win.insert('1.0', dfresult)
-    win.tag_add('yellowbkg', '1.0', '1.end')
+    # dfresult = data_1.query(q_expression)
+    data_current = data_1.query(q_expression)
 
-    # update buttons to reflect filter/no filter
-    btn_data_unfilter.configure(style='MyButton1.TButton')
-    btn_data_filter.configure(style='MyButton2.TButton')
+    win.configure(state='normal')
+    win.delete('1.0', tk.END)
+
+    win.insert('1.0', data_current)
+    win.tag_add('redtext', '1.0', '1.end')
+    win.configure(state='disabled')
+
+    stats_agg = data_current.agg(stats_dict)
+    stat_win.configure(state='normal')
+    statwin.delete('1.0', tk.END)
+    with pd.option_context('display.float_format', '{:0.2f}'.format):
+        statwin.insert('1.0', stats_agg)
+
+    # statwin.tag_add('bolded', '1.0', '1.end')
+    style_df_text(statwin, stat_list)
+
+    # print('filtered stats:')
+    # print(f'data_current is\n {data_current}')
+    # print(f'stat_win is {stat_win}')
+    # print(f'stats_agg is\n {stats_agg}')
+    # print()
+
+    data_unfilter_btn.configure(style='MyButton1.TButton')
+    data_filter_btn.configure(style='Opt1_on.TButton')
 
 
 def validate_criterion(input):
@@ -438,28 +442,25 @@ def validate_criterion(input):
     return criterion
     
 
-# NOT USED
-def validate_term(t):
-    """Future: Make a reasonable guess about ambiguous filter entry.
-     
-    Example: >=>>value. Handle typos, redundant operators, numerics in    
-    text columns, etc.
-    """
-    pass
-    # return t
-
-
-def data_unfilter(win, df):
+def data_unfilter(win, statwin, df):
     """Display the complete dataset."""
 
     dfresult = df
+    win.configure(state='normal')
     win.delete('1.0', tk.END)
     win.insert('1.0', dfresult)
-    win.tag_add('cyanbkg', '1.0', '1.end')
+    win.tag_add('bluetext', '1.0', '1.end')
 
-    # update buttons to reflect filter/no filter
-    btn_data_unfilter.config(style = 'MyButton2.TButton')
-    btn_data_filter.config(style = 'MyButton1.TButton')
+    stats_agg = data_current.agg(stats_dict)
+    statwin.configure(state='normal')
+    statwin.delete('1.0', tk.END)
+    with pd.option_context('display.float_format', '{:0.2f}'.format):
+        statwin.insert('1.0', stats_agg)
+
+    style_df_text(statwin, stat_list)
+
+    data_unfilter_btn.config(style = 'Opt2_on.TButton')
+    data_filter_btn.config(style = 'MyButton1.TButton')
 
 
 def line_plot(df: pd.DataFrame,
@@ -500,12 +501,6 @@ def bar_plot(df: pd.DataFrame,
     plt.show()
 
 
-# def get_category_list():
-#     catlist_raw = category_values_ent.get()
-
-#     return list(catlist_raw.split(', '))
-    
-
 def scatter_plot(df: pd.DataFrame, 
                  x_variable: tk.StringVar,
                  y_variable: tk.StringVar) -> None:
@@ -522,11 +517,11 @@ def scatter_plot(df: pd.DataFrame,
 
     category = category_lb.get(category_lb.curselection())
 
-    catlist = plotui.value_list
+    catlist = custui.value_list
 
     # print('in scatter plot, got these:')
     # print(f'   category: {category}')
-    # print(f'   catlist: {catlist}')
+    print(f'   catlist: {catlist}')
 
     def create_plot(data, cat):
         data.plot.scatter(x=source['x'],
@@ -571,6 +566,8 @@ bar_data_source = 'TID'
 x_text = 'x'
 y_text = 'y'
 
+data_current = None
+
 # for scatter plot
 # NOT USED... needed?
 use_category = False
@@ -583,9 +580,11 @@ data_1 = clean_column_names(data_1)
 
 data_columns = list(data_1.columns)
 
+# to update the display...
+data_current = data_1
 
-# Data UI
-# =======
+# Display UI
+# ==========
 data_ui = ttk.Frame(root, border=2, relief='raised')
 
 data_label = ttk.Label(data_ui, text='data:')
@@ -598,14 +597,17 @@ data_win = tk.Text(data_ui, width=50, height=15,
                    relief='sunken',
                    name='datawin')
 
-data_win.tag_configure("cyanbkg", background="cyan")
-data_win.tag_configure("yellowbkg", background="yellow")
+data_win.tag_configure("bluetext", foreground='blue')
+data_win.tag_configure("redtext", foreground='red')
 
 data_win.pack(padx=10, pady=5, fill='x', expand=True)
 
-data_win.insert('1.0', data_1)
+# data_win.insert('1.0', data_1)
+data_win.insert('1.0', data_current)
+data_win.configure(state='disabled')
+
 # ("1.0 lineend" also works for end-of-line)
-data_win.tag_add('cyanbkg', '1.0', '1.end')
+data_win.tag_add('bluetext', '1.0', '1.end')
 
 data_scroll = ttk.Scrollbar(data_ui, orient='vertical', command=data_win.yview)
 data_win.pack(side='left', pady=5, fill='x', expand=True)
@@ -619,8 +621,8 @@ data_win['yscrollcommand'] = data_scroll.set
 # plusminus = u'\u00B1'
 
 stat_ui = ttk.Frame(root, border=2, relief='raised')
-stat_label = ttk.Label(stat_ui, text='statistics:')
-stat_label.pack(anchor='w')
+stat_lab = ttk.Label(stat_ui, text='statistics:')
+stat_lab.pack(anchor='w')
 
 stat_win = tk.Text(stat_ui, width=50, height=7,
                      background='beige',
@@ -645,9 +647,14 @@ for c in data_1.columns:
         # numeric_cols.append(c)
         stats_dict[c] = stat_list
 
-stats_agg = data_1.agg(
-    stats_dict
-)
+# stats_agg = data_1.agg(stats_dict)
+stats_agg = data_current.agg(stats_dict)
+
+# print('initial stats:')
+# print(f'data_current is\n {data_current}')
+# print(f'stat_win is {stat_win}')
+# print(f'stats_agg is\n {stats_agg}')
+# print()
 
 # Format floating point values
 # method 1: format for display but don't change the DataFrame
@@ -662,33 +669,35 @@ with pd.option_context('display.float_format', '{:0.2f}'.format):
 # TODO
 
 stat_win.tag_configure("bolded", font=('Courier New', 14, 'bold'))
-stat_win.tag_add('bolded', '1.0', '1.end')
+# stat_win.tag_add('bolded', '1.0', '1.end')
 
-for e in range(2, len(stat_list) + 2):
-    row = str(format(e, '0.1f'))
-    strend = row + ' wordend'
-    stat_win.tag_add('bolded', row, strend)
+# for e in range(2, len(stat_list) + 2):
+#     row = str(format(e, '0.1f'))
+#     strend = row + ' wordend'
+#     stat_win.tag_add('bolded', row, strend)
 
-stat_win.configure(state='disabled')
+# stat_win.configure(state='disabled')
+style_df_text(stat_win, stat_list)
 
 
 # Data filtering UI
 # =================
 filter_ui = ttk.Frame(root, border=2, relief='raised')
 
-filter_frame = ttk.Frame(filter_ui, border=2, relief='groove')
+filter_fr = ttk.Frame(filter_ui, border=2, relief='groove')
 
-filter_label = ttk.Label(filter_ui, text='filter:')
-filter_label.pack(anchor='w')
+filter_lab = ttk.Label(filter_ui, text='filter:')
+filter_lab.pack(anchor='w')
 
-btn_data_filter = ttk.Button(filter_frame,
+data_filter_btn = ttk.Button(filter_fr,
                         text='criteria:',
-                        command=lambda w=data_win: data_filter(w))
+                        style='MyButton1.TButton',
+                        command=lambda w=data_win, s=stat_win: data_filter(w, s))
 
-btn_data_filter.pack(side='left', padx=5, pady=10)
+data_filter_btn.pack(side='left', padx=5, pady=10)
 
-filter_spec_frame = tk.Frame(filter_frame, border=4, bg='yellow')
-filter_spec_frame.pack(side='left', padx=10, pady=10)
+filter_spec_fr = tk.Frame(filter_fr, border=4, bg='yellow')
+filter_spec_fr.pack(side='left', padx=10, pady=10)
 
 filt_rows = []
 filt_vars = []
@@ -698,7 +707,7 @@ filt_entries = []
 filt_buttons_add = []
 filt_buttons_subt = []
 
-rowframe = create_criterion_row()
+rowframe = create_criterion_row(data_win, stat_win)
 
 # print(f'cb     filt: {rowframe.winfo_children()[0]}')
 # print(f'entry  crit: {rowframe.winfo_children()[1]}')
@@ -717,13 +726,14 @@ filt_rows[0].grid(row=0, column=0, sticky='nw')
 # print(f'filt_rows[1] grid info: {filt_rows[1].grid_info()}')
 # print(f'   items: {filt_rows[1].grid_info().items}')
 
-btn_data_unfilter = ttk.Button(filter_ui,
+data_unfilter_btn = ttk.Button(filter_ui,
                         text='show all data',
-                        style='MyButton2.TButton',
-                        command=lambda w=data_win, d=data_1: data_unfilter(w, d))
-btn_data_unfilter.pack(side='bottom', pady=5)
+                        # style='MyButton2.TButton',
+                        style='Opt2_on.TButton',
+                        command=lambda w=data_win, s=stat_win, d=data_1: data_unfilter(w, s, d))
+data_unfilter_btn.pack(side='bottom', pady=5)
 
-filter_frame.pack(padx=10, pady=10, fill='both')
+filter_fr.pack(padx=10, pady=10, fill='both')
 # filter_ui.pack(padx=5, pady=5, side='right', fill='both')
 
 
@@ -740,20 +750,20 @@ line_data_x = tk.StringVar()
 line_data_y = tk.StringVar()
 
 btn_line_plot = ttk.Button(plotting_main,
-                  text='Line plot',
-                  command=lambda df=data_1, x=line_data_x, y=line_data_y: line_plot(df, x, y))
+                text='Line plot',
+                command=lambda df=data_1, x=line_data_x, y=line_data_y: line_plot(df, x, y))
 
-frame_line_x = plotui.FramedCombo(plotting_main,
-                                  cb_values=data_columns,
-                                  name=x_text,
-                                  var=line_data_x,
-                                  posn=[0,1])
+line_x_fr = custui.FramedCombo(plotting_main,
+                               cb_values=data_columns,
+                               name=x_text,
+                               var=line_data_x,
+                               posn=[0,1])
 
-frame_line_y = plotui.FramedCombo(plotting_main,
-                                  cb_values=data_columns[2:],
-                                  name=y_text,
-                                  var=line_data_y,
-                                  posn=[0,2])
+line_y_fr = custui.FramedCombo(plotting_main,
+                               cb_values=data_columns[2:],
+                               name=y_text,
+                               var=line_data_y,
+                               posn=[0,2])
 
 # ---------- Bar plot
 # bar_data = tk.StringVar(value=data_columns[2])
@@ -761,46 +771,59 @@ bar_data_x = tk.StringVar()
 bar_data_y = tk.StringVar()
 
 btn_bar_plot = ttk.Button(plotting_main,
-                  text='Bar plot',
-                  command=lambda df=data_1, x=bar_data_x, y=bar_data_y: bar_plot(df, x, y))
+               text='Bar plot',
+               command=lambda df=data_1, x=bar_data_x, y=bar_data_y: bar_plot(df, x, y))
 
-frame_bar_x = plotui.FramedCombo(plotting_main,
-                               cb_values=data_columns[1:],
-                               name=x_text,
-                               var=bar_data_x,
-                               posn=[1,1])
+bar_x_fr = custui.FramedCombo(plotting_main,
+                              cb_values=data_columns[1:],
+                              name=x_text,
+                              var=bar_data_x,
+                              posn=[1,1])
 
-frame_bar_y = plotui.FramedCombo(plotting_main,
-                               cb_values=data_columns[2:],
-                               name=y_text,
-                               var=bar_data_y,
-                               posn=[1,2])
+bar_y_fr = custui.FramedCombo(plotting_main,
+                              cb_values=data_columns[2:],
+                              name=y_text,
+                              var=bar_data_y,
+                              posn=[1,2])
 
-# ---------- Scatter plot selection
+# ---------- Scatter plot
 scatter_x = tk.StringVar()
 scatter_y = tk.StringVar()
+
 btn_scatter_plot = ttk.Button(plotting_main,
                    text='Scatter plot',
                    command=lambda df=data_1, x=scatter_x, y=scatter_y: scatter_plot(df, x, y)
                    )
 
-frame_scatter_basic = ttk.Frame(plotting_main, border=2, relief='groove')
-do_category = tk.IntVar(master=frame_scatter_basic, value = 0, name='do_category')
-do_category_chkb = ttk.Checkbutton(frame_scatter_basic,
+scatter_x_fr = custui.FramedCombo(plotting_main,
+                               cb_values=data_columns[1:],
+                               name=x_text,
+                               var=scatter_x,
+                               posn=[2,1])
+
+scatter_y_fr = custui.FramedCombo(plotting_main,
+                               cb_values=data_columns[2:],
+                               name=y_text,
+                               var=scatter_y,
+                               posn=[2,2])
+
+scatter_setup_fr = ttk.Frame(plotting_main, border=2, relief='groove')
+
+use_category = tk.IntVar(master=scatter_setup_fr, value = 0, name='use_category')
+use_category_chkb = ttk.Checkbutton(scatter_setup_fr,
                                    text='Use category:',
                                    width=15,
                                    offvalue=0,
-                                   variable=do_category,
-                                   command=lambda n='do_category': set_use_category(n)
+                                   variable=use_category,
+                                   command=lambda n='use_category': set_use_category(n)
                                    )
                                 #  style='MyCheckbutton.TCheckbutton')
-do_category_chkb.bind('<Button-1>', chkb_extra)
-
+use_category_chkb.bind('<Button-1>', chkb_extra)
 
 category_list = ['', 'gender']
 cat_var = tk.Variable(value=category_list)
 
-category_lb= tk.Listbox(frame_scatter_basic,
+category_lb= tk.Listbox(scatter_setup_fr,
                         exportselection=False,
                         height=2,
                         width=10,
@@ -816,54 +839,50 @@ category_lb.select_set(0)
 # for ind, val in enumerate(category_list):
 #     category_lb.insert(ind, val)
 
-label_cat_list = tk.Label(frame_scatter_basic, text='with category values:')
+label_cat_list = tk.Label(scatter_setup_fr, text='with category values:')
 
 category_values = '(auto)'
 cat_val_var = tk.StringVar(value=category_values)
-category_values_ent = plotui.MyEntry(frame_scatter_basic, textvariable=cat_val_var)
+# category_values_ent = plotui.MyEntry(scatter_setup_fr, 
+#                                      name='categories',
+#                                      textvariable=cat_val_var)
+category_values_ent = custui.MyEntry(scatter_setup_fr, 
+                                     name='categories',
+                                     text=cat_val_var)
 
 
-do_category_chkb.grid(row=0, column=0, padx=5, sticky='w')
+use_category_chkb.grid(row=0, column=0, padx=5, sticky='w')
 
 category_lb.grid(row=1, column=0, padx=5, pady=10, sticky='w')
 
 label_cat_list.grid(row=0, column=1, padx=5, sticky='w')
 category_values_ent.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
-scatter_x_fr = plotui.FramedCombo(plotting_main,
-                               cb_values=data_columns[1:],
-                               name=x_text,
-                               var=scatter_x,
-                               posn=[2,1])
 
-scatter_y_fr = plotui.FramedCombo(plotting_main,
-                               cb_values=data_columns[2:],
-                               name=y_text,
-                               var=scatter_y,
-                               posn=[2,2])
+# global UI
+# =========
+btnq = ttk.Button(root, text='Quit', command=root.destroy)
+btnq.configure(style='MyButton1.TButton')
 
 
-# grid the plotting UI
-# --------------------
+# grid the UI
+# -----------
 y_spacing = 5
 
+# plotting
 btn_line_plot.grid(row=0, column=0, padx=5, pady=y_spacing, sticky=tk.W)
 btn_bar_plot.grid(row=1, column=0, padx=5, pady=y_spacing, sticky=tk.W)
 btn_scatter_plot.grid(row=2, column=0, padx=5, pady=y_spacing, sticky=tk.W)
-frame_scatter_basic.grid(row=3, column=0, columnspan=3, padx=5, pady=y_spacing)
+scatter_setup_fr.grid(row=3, column=0, columnspan=3, padx=5, pady=y_spacing)
 
 plotting_main.pack(padx=5, pady=5, fill='both')
 
-# grid the main UI sections
+# main UI sections
 data_ui.grid(row=0, column=0, padx=5, pady=5, sticky='nsew')
 stat_ui.grid(row=1, column=0, padx=5, pady=5, sticky='nsew')
 filter_ui.grid(row=0, column=1, padx=5, pady=5, sticky='nsew')
 plot_label_fr.grid(row=1, column=1, padx=5, pady=5, sticky='nsew')
 
-
-
-btnq = ttk.Button(root, text='Quit', command=root.destroy)
-# btnq.pack(fill='x', padx=10, pady=10)
 btnq.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
 
 root.mainloop()
