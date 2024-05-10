@@ -46,11 +46,12 @@ class MyEntry(ttk.Entry):
     def set_cat_val_list(self, ev):
         rawlist = self.get()
         list1 = list(rawlist.split(','))
+        print(f'list1: {len(list1)}')
         this.value_list = [e.strip() for e in list1]
         
         print(f'value_list: {this.value_list}')
-        print(f'MyEntry name: {self.name}')
-        print(f'textvariable: {self.textvariable.get()}')
+        # print(f'MyEntry name: {self.name}')
+        # print(f'textvariable: {self.textvariable.get()}')
 
 
 

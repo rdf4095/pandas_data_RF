@@ -77,8 +77,15 @@ history:
             styling of statistics window to function style_df_text. Rename
             style tags for main data window. For scatterplot, accept category
             value list upon mouseout of the Entry widget.
+05-04-2024  Add n, number of data rows, to statistics window. Remove some
+            print statements.
+            Filter criterion widget rows are added by passing arguments for
+            the output windows (Text widgets).
+05-09-2024  Bug fix: when a filter row widget is removed, reset row numbers
+            for the remaining rows.
 
 TODO:
+    - try adding widget rows using global variables instead of fxn arguments.
     - use tkinter.font to control multiple Labels, and the '+' character
     - separate data_filter() into 2 parts: 1) construct query, 2) apply filter,
       since we will eventually apply filters programmatically.
@@ -111,7 +118,6 @@ def style_df_text(win, itemlist):
 
     The tag that is added is defined externally.
     """
-    # stat_win.tag_configure("bolded", font=('Courier New', 14, 'bold'))
     win.tag_add('bolded', '1.0', '1.end')
 
     for e in range(2, len(itemlist) + 2):
@@ -123,7 +129,7 @@ def style_df_text(win, itemlist):
 
 
 def attend():
-    """postcommand for 1 or more Combobox widgets.
+    """postcommand for Combobox widgets.
     
     NOT currently used.
     """
@@ -138,7 +144,6 @@ def set_use_category(varname):
     
     Select a row in the corresponding Listbox.
     """
-
     do_cat = use_category.get()
 
     do_cat_test = scatter_setup_fr.getvar(name=varname)
@@ -161,6 +166,7 @@ def chkb_extra(ev):
     print(f'   ev: {ev}')
 
 
+# NOT USED
 # debug: demonstrate that the value was set
 #        ...bound to ListboxSelect but never used for anything.
 def set_category(ev):
@@ -183,6 +189,8 @@ def set_category_value_list(ev):
 
 
 def create_criterion_row(datawin, statwin):
+    """Add a new row of widgets for defining a data filter criterion."""
+
     nextrowframe = tk.Frame(filter_spec_fr, border=2, bg='cyan')
 
     var = tk.StringVar()
@@ -192,7 +200,7 @@ def create_criterion_row(datawin, statwin):
                            textvariable=var,
                            values=data_columns)
 
-    filt_cb.bind('<<ComboboxSelected>>', select_filter_column)
+    # filt_cb.bind('<<ComboboxSelected>>', select_filter_column)
 
     criterion = tk.StringVar()    
     entry = ttk.Entry(nextrowframe, width=7, textvariable=criterion)
@@ -205,7 +213,7 @@ def create_criterion_row(datawin, statwin):
     button_add = ttk.Button(nextrowframe,
                             text='+',
                             width=1,
-                            command=lambda: add_criterion_row())
+                            command=lambda d=datawin, s=statwin: add_criterion_row(d, s))
     
     filt_cb.grid(row=0, column=0)
     entry.grid(row=0, column=1)
@@ -218,21 +226,24 @@ def create_criterion_row(datawin, statwin):
     return nextrowframe
 
 
-def add_criterion_row():
-    """Add a row of widgets to define a filter criterion."""
-
+def add_criterion_row(datawin, statwin):
+    """Add a row of widgets to define a filter criterion.
+    
+    The 'criteria' button must be used to filter with the new criterion.
+    """
     rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
     num_gridded = len(rows_gridded)
     print(f'adding row (filt_rows: {len(filt_rows)})')
     print(f'   {num_gridded} rows on grid:')
     for r in rows_gridded:
         print(f'   {r}')
+        # print(f'   row: {r.grid_info()["row"]}')
 
     if num_gridded == len(data_columns):
         return
 
-    newrow = create_criterion_row()
-    print(f'   ...adding row {newrow}')
+    newrow = create_criterion_row(datawin, statwin)
+    print(f'   ...adding row {newrow} at row: {num_gridded}')
     filt_rows.append(newrow)
     newrow.grid(row=num_gridded, column=0, sticky='nw')
 
@@ -249,39 +260,45 @@ def remove_criterion_row(n, datawin, statwin):
     """
     rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
     num_gridded = len(rows_gridded)
-    # print('rows on grid:')
-    # for r in rows_gridded:
-    #     print(f'   {r}')
 
+    print(f'removing row (filt_rows: {len(filt_rows)})')
+    print(f'   {num_gridded} rows on grid:')
+    for r in rows_gridded:
+        print(f'   {r}')
+
+    # don't remove the only row
     if num_gridded == 1:
         return
     
+    rem = n.grid_info()
+    print(f'   removing row {rem["row"]}')
     # clear filter for the row
-    # filt_cboxes[n].set('')
-    # filt_entries[n].delete(0, tk.END)
     n.winfo_children()[0].set('')
     n.winfo_children()[1].delete(0, tk.END)
 
-    # don't remove the only row
-    print(f'removing row {n}')
+    n.grid_forget()
     filt_rows.remove(n)
-    n.grid_remove()
+    
+    for index, r in enumerate(filt_rows):
+        print(f'index, r: {index}, {r}')
+        r.grid_forget()
+        r.grid(row=index, column=0, sticky='nw')
     
     rows_now_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
     num_now_gridded = len(rows_now_gridded)
 
-    print(f'rows now on grid: {num_now_gridded}')
+    print(f'   rows now on grid: {num_now_gridded}')
     for index, r in enumerate(rows_now_gridded):
         print(f'   {r}')
         # r.rowconfigure(index, weight=1)
+    print()
 
     rows_now_gridded[-1].winfo_children()[3].grid(row=0, column=3, sticky='nw')
-
-    print()
 
     data_filter(datawin, statwin)
 
 
+# NOT USED -- does it have some use?
 def select_filter_column(ev):
     """Read Combobox to get item for data filter."""
 
@@ -321,7 +338,7 @@ def data_filter(win, statwin):
 
     # for i in range(len(data_columns)):
     for i in range(len(filt_rows)):
-        """Another method, instead of of query, is to use a series of 
+        """Another method, instead of query, would be to use a series of 
         terms like: df[col] > 55. This doesn't require cleaning col names.
         """
         current_term = ''
@@ -330,7 +347,6 @@ def data_filter(win, statwin):
         this_criterion = filt_rows[i].winfo_children()[1].get()
         print(f'filt, crit: {this_filter}, {this_criterion}')
 
-        # if filt_vars[i].get() != '' and criterion_vars[i].get() != '':
         if this_filter != '' and this_criterion != '':
 
             # dcolumn.append(filt_vars[i].get())
@@ -392,6 +408,10 @@ def data_filter(win, statwin):
 
     # statwin.tag_add('bolded', '1.0', '1.end')
     style_df_text(statwin, stat_list)
+
+    nvalue = 'n = ' + str(data_current.count().iloc[0])
+    stat_n_lab.configure(text=nvalue)
+
 
     # print('filtered stats:')
     # print(f'data_current is\n {data_current}')
@@ -459,6 +479,9 @@ def data_unfilter(win, statwin, df):
 
     style_df_text(statwin, stat_list)
 
+    nvalue = 'n = ' + str(data_current.count().iloc[0])
+    stat_n_lab.configure(text=nvalue)
+
     data_unfilter_btn.config(style = 'Opt2_on.TButton')
     data_filter_btn.config(style = 'MyButton1.TButton')
 
@@ -520,8 +543,7 @@ def scatter_plot(df: pd.DataFrame,
     catlist = custui.value_list
 
     # print('in scatter plot, got these:')
-    # print(f'   category: {category}')
-    print(f'   catlist: {catlist}')
+    # print(f'   catlist: {catlist}')
 
     def create_plot(data, cat):
         data.plot.scatter(x=source['x'],
@@ -536,7 +558,7 @@ def scatter_plot(df: pd.DataFrame,
             df2[category] = df2[category].astype('category')
             plot_data = df2
         else:
-            print('if category else...')
+            # print('if category else...')
             df2[category] = pd.Categorical(df2[category], categories=catlist, ordered=False)    
             plot_data = df2[df2[category].isin(catlist)]
     else:
@@ -582,6 +604,8 @@ data_columns = list(data_1.columns)
 
 # to update the display...
 data_current = data_1
+# test: get column by col number
+# print(f'ages: {data_current.iloc[:, [2]]}')
 
 # Display UI
 # ==========
@@ -622,7 +646,9 @@ data_win['yscrollcommand'] = data_scroll.set
 
 stat_ui = ttk.Frame(root, border=2, relief='raised')
 stat_lab = ttk.Label(stat_ui, text='statistics:')
+stat_n_lab = ttk.Label(stat_ui, text='n')
 stat_lab.pack(anchor='w')
+stat_n_lab.pack(anchor='w')
 
 stat_win = tk.Text(stat_ui, width=50, height=7,
                      background='beige',
@@ -650,6 +676,25 @@ for c in data_1.columns:
 # stats_agg = data_1.agg(stats_dict)
 stats_agg = data_current.agg(stats_dict)
 
+# get the number of data rows that have a 'pt code' (which is all of them):
+# one way: the most succinct way that I can find, that uses a pandas function
+# ...The chosen way, since for this data, column 1 is guaranteed to contain
+# only real data, with no missing values.
+# print(f'items in data_current: {data_current.count().iloc[0]}')
+
+# a ssecond way: slightly more verbose
+# print(f'items in data_current: {data_current.iloc[:, 0].count()}')
+
+# a third way: depends on knowing the column header
+# print(f'items in data_current: {data_current["pt_code"].count()}')
+
+# a fourth way: simplest, does not use a pandas function
+# print(f'items in data_current: {len(data_current)}')
+
+
+nvalue = 'n = ' + str(data_current.count().iloc[0])
+stat_n_lab.configure(text=nvalue)
+
 # print('initial stats:')
 # print(f'data_current is\n {data_current}')
 # print(f'stat_win is {stat_win}')
@@ -669,14 +714,7 @@ with pd.option_context('display.float_format', '{:0.2f}'.format):
 # TODO
 
 stat_win.tag_configure("bolded", font=('Courier New', 14, 'bold'))
-# stat_win.tag_add('bolded', '1.0', '1.end')
 
-# for e in range(2, len(stat_list) + 2):
-#     row = str(format(e, '0.1f'))
-#     strend = row + ' wordend'
-#     stat_win.tag_add('bolded', row, strend)
-
-# stat_win.configure(state='disabled')
 style_df_text(stat_win, stat_list)
 
 
@@ -708,6 +746,7 @@ filt_buttons_add = []
 filt_buttons_subt = []
 
 rowframe = create_criterion_row(data_win, stat_win)
+filter_spec_fr.grid_propagate(True)
 
 # print(f'cb     filt: {rowframe.winfo_children()[0]}')
 # print(f'entry  crit: {rowframe.winfo_children()[1]}')
@@ -720,7 +759,9 @@ filt_entries.append(rowframe.winfo_children()[1])
 filt_buttons_subt.append(rowframe.winfo_children()[2])
 filt_buttons_add.append(rowframe.winfo_children()[3])
 
-filt_rows[0].grid(row=0, column=0, sticky='nw')
+# filt_rows[0].grid(row=0, column=0, sticky='nw')
+rowframe.grid(row=0, column=0, sticky='nw')
+
 
 # print(f'filt_rows[0] grid info: {filt_rows[0].grid_info()}')
 # print(f'filt_rows[1] grid info: {filt_rows[1].grid_info()}')
@@ -745,7 +786,6 @@ plotting_main = ttk.Frame(plot_label_fr)
 plotting_label.pack(anchor='w')
 
 # ---------- Line plot
-# line_data = tk.StringVar(value=data_columns[2])
 line_data_x = tk.StringVar()
 line_data_y = tk.StringVar()
 
@@ -843,9 +883,6 @@ label_cat_list = tk.Label(scatter_setup_fr, text='with category values:')
 
 category_values = '(auto)'
 cat_val_var = tk.StringVar(value=category_values)
-# category_values_ent = plotui.MyEntry(scatter_setup_fr, 
-#                                      name='categories',
-#                                      textvariable=cat_val_var)
 category_values_ent = custui.MyEntry(scatter_setup_fr, 
                                      name='categories',
                                      text=cat_val_var)
