@@ -83,9 +83,12 @@ history:
             the output windows (Text widgets).
 05-09-2024  Bug fix: when a filter row widget is removed, reset row numbers
             for the remaining rows.
+05-16-2024  Small style changes: Bold the panel headings ('data' etc.), stats
+            padding & # rows.
+05-18-2024  Move 'not used' items to file not_used.py for archiving. Remove some
+            old commented lines. Re-arrange global objects definition order.
 
 TODO:
-    - try adding widget rows using global variables instead of fxn arguments.
     - use tkinter.font to control multiple Labels, and the '+' character
     - separate data_filter() into 2 parts: 1) construct query, 2) apply filter,
       since we will eventually apply filters programmatically.
@@ -164,28 +167,6 @@ def set_use_category(varname):
 def chkb_extra(ev):
     print('in chkb_extra...')
     print(f'   ev: {ev}')
-
-
-# NOT USED
-# debug: demonstrate that the value was set
-#        ...bound to ListboxSelect but never used for anything.
-def set_category(ev):
-    """Listbox callback: select categorical variable (data column).
-    
-    Used for a scatter plot.
-    """
-
-    cat = category_lb.get(category_lb.curselection())
-
-
-# debug: demonstrate that the value list was set
-# NOT USED
-def set_category_value_list(ev):
-    """Entry callback: set the category value list."""
-
-    cat_list = category_values_ent.get()
-    print(f'in set_category list: {cat_list}')
-    print()
 
 
 def create_criterion_row(datawin, statwin):
@@ -297,17 +278,6 @@ def remove_criterion_row(n, datawin, statwin):
 
     data_filter(datawin, statwin)
 
-
-# NOT USED -- does it have some use?
-def select_filter_column(ev):
-    """Read Combobox to get item for data filter."""
-
-    which_filt = ev.widget.winfo_name()
-    val = ev.widget.get()
-    # print('in select_filter_column:')
-    # print(f'...from {which_filt}, filt by: {val}')
-    # print(f'...widget parent: {ev.widget.winfo_parent()}')
-    # print()
 
 """ 
 --------------------------
@@ -465,10 +435,13 @@ def validate_criterion(input):
 def data_unfilter(win, statwin, df):
     """Display the complete dataset."""
 
-    dfresult = df
+    # print(f'in data_unfilter, locals are: {locals().keys()}')
+    # print()
+
+    # dfresult = df
     win.configure(state='normal')
     win.delete('1.0', tk.END)
-    win.insert('1.0', dfresult)
+    win.insert('1.0', df)
     win.tag_add('bluetext', '1.0', '1.end')
 
     stats_agg = data_current.agg(stats_dict)
@@ -484,6 +457,13 @@ def data_unfilter(win, statwin, df):
 
     data_unfilter_btn.config(style = 'Opt2_on.TButton')
     data_filter_btn.config(style = 'MyButton1.TButton')
+
+# func = data_unfilter
+# print(f'in data_unfilter, __code__ params are:')
+# print(f'    co_varnames: {func.__code__.co_varnames}')
+# print(f'    co_argcount: {func.__code__.co_argcount}')
+# print(f'    co_nlocals: {func.__code__.co_nlocals}')
+# print()
 
 
 def line_plot(df: pd.DataFrame,
@@ -569,49 +549,49 @@ def scatter_plot(df: pd.DataFrame,
     plt.show()
 
 
-root = tk.Tk()
-root.title = 'myocardial strain'
-
-# Style objects will be added later.
-# style = ttk.Style()
-# style.configure('MyCheckbutton.TCheckbutton', foreground='black')
-styles_ttk.CreateStyles()
+# ===== END Functions =====
+    
 
 # print(f'pandas library: {pd.__version__}')
 # print(f'pandas dependencies: {pd.show_versions()}')
 
+# Module scope objects
+# ====================
+root = tk.Tk()
+root.title = 'myocardial strain'
 
-# ---------- module scope objects
+styles_ttk.CreateStyles()
+
 data_columns = ["gender", "age", "TID", "stress EF", "rest EF"]
 line_data_source = 'age'
 bar_data_source = 'TID'
+
 x_text = 'x'
 y_text = 'y'
 
 data_current = None
 
-# for scatter plot
-# NOT USED... needed?
-use_category = False
-
-
-# ---------- Read the dataset
+# Read the dataset
+# ================
+# subset of 21 records
 data_1 = pd.read_csv('data/strain_nml_sample.csv')
 
-data_1 = clean_column_names(data_1)
+# entire 91 records, slightly different columns
+# data_1 = pd.read_csv('data/strain_nml.csv')
 
+data_1 = clean_column_names(data_1)
 data_columns = list(data_1.columns)
 
-# to update the display...
+# to update the display after filtering
 data_current = data_1
-# test: get column by col number
-# print(f'ages: {data_current.iloc[:, [2]]}')
+
 
 # Display UI
 # ==========
 data_ui = ttk.Frame(root, border=2, relief='raised')
 
-data_label = ttk.Label(data_ui, text='data:')
+data_label = ttk.Label(data_ui, text='data:',
+                       style='BoldLabel.TLabel')
 data_label.pack(anchor='w')
 
 data_win = tk.Text(data_ui, width=50, height=15,
@@ -636,7 +616,6 @@ data_win.tag_add('bluetext', '1.0', '1.end')
 data_scroll = ttk.Scrollbar(data_ui, orient='vertical', command=data_win.yview)
 data_win.pack(side='left', pady=5, fill='x', expand=True)
 data_scroll.pack(side='right', fill='y', pady=5)
-# data_ui.pack(padx=5, pady=5, side='left', fill='both')
 data_win['yscrollcommand'] = data_scroll.set
 
 
@@ -645,12 +624,15 @@ data_win['yscrollcommand'] = data_scroll.set
 # plusminus = u'\u00B1'
 
 stat_ui = ttk.Frame(root, border=2, relief='raised')
-stat_lab = ttk.Label(stat_ui, text='statistics:')
-stat_n_lab = ttk.Label(stat_ui, text='n')
-stat_lab.pack(anchor='w')
-stat_n_lab.pack(anchor='w')
 
-stat_win = tk.Text(stat_ui, width=50, height=7,
+stat_lab = ttk.Label(stat_ui, text='statistics:',
+                     style='BoldLabel.TLabel')
+stat_lab.pack(anchor='w')
+
+stat_n_lab = ttk.Label(stat_ui, text='n')
+stat_n_lab.pack(anchor='w', padx=10)
+
+stat_win = tk.Text(stat_ui, width=50, height=10,
                      background='beige',
                      foreground='black',
                      font=('Courier New', 14),
@@ -658,11 +640,9 @@ stat_win = tk.Text(stat_ui, width=50, height=7,
                      relief='sunken', name='statwin')
 
 stat_scroll = ttk.Scrollbar(stat_ui, orient='vertical', command=stat_win.yview)
-stat_win.pack(side='left', pady=5, fill='x', expand=True)
+stat_win.pack(side='left', padx=10, pady=5, fill='x', expand=True)
 stat_scroll.pack(side='right', fill='y', pady=5)
 stat_win['yscrollcommand'] = stat_scroll.set
-
-# stat_ui.pack(padx=5, pady=5, side='left', fill='both')
 
 # for a good summary of skew and kurtosis, see medium.com
 stat_list = ['mean', 'std', 'min', 'median', 'max', 'skew', 'kurtosis']
@@ -724,7 +704,8 @@ filter_ui = ttk.Frame(root, border=2, relief='raised')
 
 filter_fr = ttk.Frame(filter_ui, border=2, relief='groove')
 
-filter_lab = ttk.Label(filter_ui, text='filter:')
+filter_lab = ttk.Label(filter_ui, text='filter:',
+                       style='BoldLabel.TLabel')
 filter_lab.pack(anchor='w')
 
 data_filter_btn = ttk.Button(filter_fr,
@@ -775,13 +756,13 @@ data_unfilter_btn = ttk.Button(filter_ui,
 data_unfilter_btn.pack(side='bottom', pady=5)
 
 filter_fr.pack(padx=10, pady=10, fill='both')
-# filter_ui.pack(padx=5, pady=5, side='right', fill='both')
 
 
 # plotting UI
 # ===========
 plot_label_fr = ttk.Frame(root, border=2, relief='raised')
-plotting_label = ttk.Label(plot_label_fr, text='plotting:')
+plotting_label = ttk.Label(plot_label_fr, text='plotting:',
+                           style='BoldLabel.TLabel')
 plotting_main = ttk.Frame(plot_label_fr)
 plotting_label.pack(anchor='w')
 
@@ -795,13 +776,17 @@ btn_line_plot = ttk.Button(plotting_main,
 
 line_x_fr = custui.FramedCombo(plotting_main,
                                cb_values=data_columns,
-                               name=x_text,
+                               display_name=x_text,
+                               name='line_x',
                                var=line_data_x,
                                posn=[0,1])
 
+# print(f'FramedCombo line_x_fr name: {line_x_fr.name}')
+
 line_y_fr = custui.FramedCombo(plotting_main,
                                cb_values=data_columns[2:],
-                               name=y_text,
+                               display_name=y_text,
+                               name='line_y',
                                var=line_data_y,
                                posn=[0,2])
 
@@ -816,13 +801,15 @@ btn_bar_plot = ttk.Button(plotting_main,
 
 bar_x_fr = custui.FramedCombo(plotting_main,
                               cb_values=data_columns[1:],
-                              name=x_text,
+                              display_name=x_text,
+                              name='bar_x',
                               var=bar_data_x,
                               posn=[1,1])
 
 bar_y_fr = custui.FramedCombo(plotting_main,
                               cb_values=data_columns[2:],
-                              name=y_text,
+                              display_name=x_text,
+                              name='bar_y',
                               var=bar_data_y,
                               posn=[1,2])
 
@@ -837,13 +824,18 @@ btn_scatter_plot = ttk.Button(plotting_main,
 
 scatter_x_fr = custui.FramedCombo(plotting_main,
                                cb_values=data_columns[1:],
-                               name=x_text,
+                               display_name=x_text,
+                               name='scatter_x',
                                var=scatter_x,
                                posn=[2,1])
 
+
+# print(f'props of object scatter_x_fr: {scatter_x_fr.props()}')
+
 scatter_y_fr = custui.FramedCombo(plotting_main,
                                cb_values=data_columns[2:],
-                               name=y_text,
+                               display_name=x_text,
+                               name='scatter_y',
                                var=scatter_y,
                                posn=[2,2])
 
@@ -870,8 +862,6 @@ category_lb= tk.Listbox(scatter_setup_fr,
                         listvariable=cat_var
                         )
 
-# not required: use for debug
-category_lb.bind('<<ListboxSelect>>', set_category)
 category_lb.select_set(0)
 
 # alternate way to load values to the Listbox category_lb. This may be the
@@ -886,7 +876,6 @@ cat_val_var = tk.StringVar(value=category_values)
 category_values_ent = custui.MyEntry(scatter_setup_fr, 
                                      name='categories',
                                      text=cat_val_var)
-
 
 use_category_chkb.grid(row=0, column=0, padx=5, sticky='w')
 
@@ -921,5 +910,33 @@ filter_ui.grid(row=0, column=1, padx=5, pady=5, sticky='nsew')
 plot_label_fr.grid(row=1, column=1, padx=5, pady=5, sticky='nsew')
 
 btnq.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+
+
+# inspect functions
+import inspect
+functions = [data_unfilter]
+# fxn_names = [str(f) for f in functions]
+print(str(functions[0]))
+fxn_names = [inspect.getmodulename(f for f in functions]
+
+arg_spec = inspect.getfullargspec(functions[0])
+# print(f'NAMES   : {arg_spec[0]}')
+# print(f'*       : {arg_spec[1]}')
+# print(f'**      : {arg_spec[2]}')
+# print(f'defaults: {arg_spec[3]}')
+print()
+if arg_spec[3] is not None:
+    args_with_defaults = arg_spec[0][-len(arg_spec[3]):]
+    print(f'   args & defaults: {zip(args_with_defaults, arg_spec[3])}')
+# else:
+#     print(f'   arg names: {arg_spec[0]}')
+
+print()
+sig = (inspect.signature(functions[0]))
+print(f'   inspect {fxn_names[0]}: {sig}')
+print()
+
+
+
 
 root.mainloop()
