@@ -16,6 +16,13 @@ history:
             to make this module more generic.
 05-14-2024  Use explicit keyword parameters for classes, instead of **kwargs.
             Add docstrings.
+05-25-2024  Update docstrings for the FramedCombo class. Fix MyEntry text arg.
+            Change value_list from a module var to a MyEntry class var, to allow
+            each MyEntry instance to keep its own value.
+05-30-2024  Add docstrings to MyEntry class.
+"""
+"""
+TODO: clarify class parent, for docstring. use superclass or object parent?
 """
 
 import sys
@@ -23,21 +30,32 @@ import tkinter as tk
 from tkinter import ttk
 
 this = sys.modules[__name__]
-
-this.value_list = None
+# this.value_list = None
 
 class MyEntry(ttk.Entry):
-    def __init__(self, parent, name='',
-                               text=''
+    """
+    MyEntry Class
+    Parent: ttk.Entry
+
+    Attributes:
+       textvariable: tk.StringVar
+       value_list: list
+
+    Methods: set_cat_val_list
+    """
+    def __init__(self, parent,
+                       name='',
+                       text=''
                 ):
         super().__init__(parent,
                          exportselection=False)
         
         # self.name = kwargs['name']
-        self.textvariable = tk.StringVar()
-        # self.textvariable.set(kwargs['text'])
         self.name = name
+        self.textvariable = tk.StringVar()
         self.textvariable.set(text)
+        self.value_list = []
+        self.insert(0, text)
 
         # optional (works)
         # self.bind('<Return>', self.set_cat_val_list)
@@ -46,43 +64,42 @@ class MyEntry(ttk.Entry):
     def set_cat_val_list(self, ev):
         rawlist = self.get()
         list1 = list(rawlist.split(','))
-        print(f'list1: {len(list1)}')
-        this.value_list = [e.strip() for e in list1]
-        
-        print(f'value_list: {this.value_list}')
+        self.value_list = [e.strip() for e in list1]
 
 
 
 class FramedCombo(ttk.Frame):
     """
-    class: FramedCombo
-    parent: ttk.Frame
+    FramedCombo Class
+    Parent: ttk.Frame
 
-    child objects: ttk.Label, ttk.Combobox
+    Defines a Frame, containing a ttk.Combobox and a ttk.Label
 
-    methods: create_widgets
+    Attributes:
+       label_name: str, text of the Label.
+
+    Child objects:
+       ttk.Label,
+       ttk.Combobox
+
+    Methods: create_widgets
     """
-    def __init__(self, parent, cb_values=['1', '2', '3'],
-                               var=None,
-                               posn=None,
-                               display_name='',
-                               name=''
+    def __init__(self, parent, 
+                       cb_values=['1', '2', '3'],
+                       var=None,
+                       posn=None,
+                       display_name='',
+                       name=''
                  ):
         """
-        class: FramedCombo
+        Inits FramedCombo
 
         Parameters:
-        ----------
-        cb_values : list
-            values passed through to the Combobox
-        var : str
-            text variable name
-        posn : list
-            x,y position for packing child objects
-        display_name : str
-            value of the Label
-        name : str
-            name attribute of the Combobox
+           cb_values: list, values passed through to the Combobox.
+           var: str, variable name.
+           posn: list, x and y position for packing child objects.
+           display_name: str, used to construct the text of the Label.
+           name: str, name attribute of the Combobox.
         """
         super().__init__(parent)
 
@@ -120,4 +137,5 @@ class FramedCombo(ttk.Frame):
         self.grid(row=self.posn[0], column=self.posn[1], padx=10)
 
     def props(self):
+        """Return parameter list for the FramedCombo instance."""
         return (self.__init__.__doc__)

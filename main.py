@@ -87,15 +87,21 @@ history:
             padding & # rows.
 05-18-2024  Move 'not used' items to file not_used.py for archiving. Remove some
             old commented lines. Re-arrange global objects definition order.
+05-20-2024  Cleaned up the 'inspect functions' section at the bottom, moved some
+            old code to not_used.py.
+05-22-2024  Debug the inspect section.
+05-25-2024  Eliminate the cat_val_var StringVar, since MyEntry creates its own.
+05-30-2024  Factor data_filter() into two parts: 1) construct data filter, 
+            2) display filtered data.
 
 TODO:
     - use tkinter.font to control multiple Labels, and the '+' character
-    - separate data_filter() into 2 parts: 1) construct query, 2) apply filter,
-      since we will eventually apply filters programmatically.
-    - data_filter now returns -1 if the filter failed. Try
-      reading this by replacing the button's command attribute
-      with a bind().
-    - re-order functions for widget interaction, based on their order in the ui.
+    - does it make sense to separate "apply filter", so we can apply 
+      filters programmatically? (it's only one line.)
+    - filter setup now returns -1 if the filter failed. Can we read this
+      by replacing the button's command attribute with a bind()?
+    - filter fxns use module variables. Can we pass these instead, to make
+      the fxns more general-purpose?
 """
 
 import tkinter as tk
@@ -111,12 +117,14 @@ import rf_custom_ui as custui
 
 styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_module()
 
+do_profile = False    # report function signatures
+
 """ 
 ----------------------------
 widget interaction functions
 ----------------------------
 """
-def style_df_text(win, itemlist):
+def style_df_text(win: object, itemlist: list=['test']) -> None:
     """Apply text styling to pandas DataFrame (df) displayed in a Text widget.
 
     The tag that is added is defined externally.
@@ -131,19 +139,8 @@ def style_df_text(win, itemlist):
     win.configure(state='disabled')
 
 
-def attend():
-    """postcommand for Combobox widgets.
-    
-    NOT currently used.
-    """
-    print("combobox activated...")
-
-
-# def read_checkb(var):
-#     print("\t", var.get())
-
-def set_use_category(varname):
-    """Checkbutton callback: scatter plot, with/without using categories.
+def set_use_category(varname: str):
+    """Checkbutton callback: for scatter plot, use/don't use categories.
     
     Select a row in the corresponding Listbox.
     """
@@ -169,7 +166,7 @@ def chkb_extra(ev):
     print(f'   ev: {ev}')
 
 
-def create_criterion_row(datawin, statwin):
+def create_criterion_row(datawin: object, statwin: object) -> object:
     """Add a new row of widgets for defining a data filter criterion."""
 
     nextrowframe = tk.Frame(filter_spec_fr, border=2, bg='cyan')
@@ -207,7 +204,7 @@ def create_criterion_row(datawin, statwin):
     return nextrowframe
 
 
-def add_criterion_row(datawin, statwin):
+def add_criterion_row(datawin: object, statwin: object) -> None:
     """Add a row of widgets to define a filter criterion.
     
     The 'criteria' button must be used to filter with the new criterion.
@@ -234,7 +231,7 @@ def add_criterion_row(datawin, statwin):
     print()
 
 
-def remove_criterion_row(n, datawin, statwin):
+def remove_criterion_row(n: object, datawin: object, statwin: object) -> None:
     """Remove a row of widgets for a filter criterion.
     
        Data is automatically re-filtered by the remaining criteria.
@@ -284,11 +281,10 @@ def remove_criterion_row(n, datawin, statwin):
 data interaction functions
 --------------------------
 """
-def clean_column_names(df):
-    """Convert single spaces in column names to underscore character.
-    
-    Future: remove other python-unacceptable characters.
-    """
+def clean_column_names(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
+    """Convert single spaces in column names to underscore character."""
+
+    # print(f'type df to clean: {type(df)}')
     cols = df.columns
     # print(f'cols: {cols}')
     cols = cols.map(lambda x: x.replace(' ', '_') if isinstance(x, str) else x)
@@ -297,7 +293,7 @@ def clean_column_names(df):
     return df
 
 
-def data_filter(win, statwin):
+def data_filter_ORIG(win: object, statwin: object) -> None:
     """Display a filtered version of the original DataFrame."""
 
     dcolumn = []
@@ -306,7 +302,6 @@ def data_filter(win, statwin):
     quote = ''
     q_expression = ''
 
-    # for i in range(len(data_columns)):
     for i in range(len(filt_rows)):
         """Another method, instead of query, would be to use a series of 
         terms like: df[col] > 55. This doesn't require cleaning col names.
@@ -334,11 +329,11 @@ def data_filter(win, statwin):
                 # filter_term = validate_term(validated_entry)
     
                 # test for numeric value.
-                # v2 test: float will pass
+                # test: float will pass
                 if validated_entry['value'].replace('.', '', 1).isnumeric():
                     quote = ''
                 else:
-                    # assume a string value
+                    # string value
                     quote = '\"'
                     
                 current_term = dcolumn[current_criterion] + validated_entry['op'] + quote + validated_entry['value'] + quote
@@ -357,10 +352,9 @@ def data_filter(win, statwin):
 
     # print(f'filt columns: {dcolumn}')
     # print(f'filt criteria: {criteria}')
-    # print(f'q_expression string: {repr(q_expression)}')
-    # print()
+    print(f'q_expression string: {repr(q_expression)}')
+    print()
 
-    # dfresult = data_1.query(q_expression)
     data_current = data_1.query(q_expression)
 
     win.configure(state='normal')
@@ -391,6 +385,89 @@ def data_filter(win, statwin):
 
     data_unfilter_btn.configure(style='MyButton1.TButton')
     data_filter_btn.configure(style='Opt1_on.TButton')
+
+# new
+def data_filter(win, statwin):
+    d = make_filter()
+    show_filtered(win, statwin, d)
+
+# new
+def make_filter():
+    dcolumn = []
+    criteria = []
+    terms = []
+    quote = ''
+    q_expression = ''
+
+    for i in range(len(filt_rows)):
+        """query() requires cleaning column names.
+        Another method would be to use a series of terms like: df[col] > 55.
+        """
+        current_term = ''
+
+        this_filter = filt_rows[i].winfo_children()[0].get()
+        this_criterion = filt_rows[i].winfo_children()[1].get()
+        print(f'filt, crit: {this_filter}, {this_criterion}')
+
+        if this_filter != '' and this_criterion != '':
+            dcolumn.append(this_filter)
+            criteria.append(this_criterion)
+
+            current_criterion = len(criteria) - 1
+            validated_entry = validate_criterion(criteria[current_criterion])
+            if validated_entry['value'] != '':
+    
+                # test for numeric value.
+                # test: float will pass
+                if validated_entry['value'].replace('.', '', 1).isnumeric():
+                    quote = ''
+                else:
+                    # string value
+                    quote = '\"'
+                    
+                current_term = dcolumn[current_criterion] + validated_entry['op'] + quote + validated_entry['value'] + quote
+            else:
+                print('No valid criterion.')
+
+            terms.append(current_term)
+
+    if len(terms) == 0:
+        # no valid filter
+        return -1
+            
+    for t in terms:
+        q_expression += (t + ' & ')
+    q_expression = q_expression[:-3]
+
+    # print(f'filt columns: {dcolumn}')
+    # print(f'filt criteria: {criteria}')
+    print(f'q_expression string: {repr(q_expression)}')
+    print()
+
+    data_current = data_1.query(q_expression)
+
+    return data_current
+
+# new
+def show_filtered(win, statwin, data):
+    win.configure(state='normal')
+    win.delete('1.0', tk.END)
+
+    win.insert('1.0', data)
+    win.tag_add('redtext', '1.0', '1.end')
+    win.configure(state='disabled')
+
+    stats_agg = data.agg(stats_dict)
+    stat_win.configure(state='normal')
+    statwin.delete('1.0', tk.END)
+    with pd.option_context('display.float_format', '{:0.2f}'.format):
+        statwin.insert('1.0', stats_agg)
+
+    # statwin.tag_add('bolded', '1.0', '1.end')
+    style_df_text(statwin, stat_list)
+
+    nvalue = 'n = ' + str(data.count().iloc[0])
+    stat_n_lab.configure(text=nvalue)
 
 
 def validate_criterion(input):
@@ -505,6 +582,7 @@ def bar_plot(df: pd.DataFrame,
 
 
 def scatter_plot(df: pd.DataFrame, 
+                 ent: object,
                  x_variable: tk.StringVar,
                  y_variable: tk.StringVar) -> None:
     """Create scatter plot for input df.
@@ -520,10 +598,15 @@ def scatter_plot(df: pd.DataFrame,
 
     category = category_lb.get(category_lb.curselection())
 
-    catlist = custui.value_list
+    # catlist = custui.value_list
+    catlist = ent.value_list
 
-    # print('in scatter plot, got these:')
     # print(f'   catlist: {catlist}')
+    if catlist in [['auto'], ['']]:
+        # user must have deleted the category list or 
+        # entered 'auto'
+        catlist = []
+
 
     def create_plot(data, cat):
         data.plot.scatter(x=source['x'],
@@ -561,6 +644,8 @@ root = tk.Tk()
 root.title = 'myocardial strain'
 
 styles_ttk.CreateStyles()
+
+category_values_ent = None
 
 data_columns = ["gender", "age", "TID", "stress EF", "rest EF"]
 line_data_source = 'age'
@@ -781,7 +866,9 @@ line_x_fr = custui.FramedCombo(plotting_main,
                                var=line_data_x,
                                posn=[0,1])
 
-# print(f'FramedCombo line_x_fr name: {line_x_fr.name}')
+# print(f'line_x_fr doc: {line_x_fr.__doc__}')
+# print()
+# print(f'props:{line_x_fr.props()}')
 
 line_y_fr = custui.FramedCombo(plotting_main,
                                cb_values=data_columns[2:],
@@ -817,9 +904,21 @@ bar_y_fr = custui.FramedCombo(plotting_main,
 scatter_x = tk.StringVar()
 scatter_y = tk.StringVar()
 
+scatter_setup_fr = ttk.Frame(plotting_main, border=2, relief='groove')
+
+category_values = 'auto'
+category_values_ent = custui.MyEntry(scatter_setup_fr, 
+                                     name='categories',
+                                    #  text=cat_val_var)
+                                     text=category_values)
+
+test_ent = custui.MyEntry(scatter_setup_fr, 
+                                     name='test_ent',                                    #  text=cat_val_var)
+                                     text='arbitrary')
+
 btn_scatter_plot = ttk.Button(plotting_main,
                    text='Scatter plot',
-                   command=lambda df=data_1, x=scatter_x, y=scatter_y: scatter_plot(df, x, y)
+                   command=lambda df=data_1, ent=category_values_ent, x=scatter_x, y=scatter_y: scatter_plot(df, ent, x, y)
                    )
 
 scatter_x_fr = custui.FramedCombo(plotting_main,
@@ -829,9 +928,6 @@ scatter_x_fr = custui.FramedCombo(plotting_main,
                                var=scatter_x,
                                posn=[2,1])
 
-
-# print(f'props of object scatter_x_fr: {scatter_x_fr.props()}')
-
 scatter_y_fr = custui.FramedCombo(plotting_main,
                                cb_values=data_columns[2:],
                                display_name=x_text,
@@ -839,7 +935,7 @@ scatter_y_fr = custui.FramedCombo(plotting_main,
                                var=scatter_y,
                                posn=[2,2])
 
-scatter_setup_fr = ttk.Frame(plotting_main, border=2, relief='groove')
+# scatter_setup_fr = ttk.Frame(plotting_main, border=2, relief='groove')
 
 use_category = tk.IntVar(master=scatter_setup_fr, value = 0, name='use_category')
 use_category_chkb = ttk.Checkbutton(scatter_setup_fr,
@@ -871,11 +967,11 @@ category_lb.select_set(0)
 
 label_cat_list = tk.Label(scatter_setup_fr, text='with category values:')
 
-category_values = '(auto)'
-cat_val_var = tk.StringVar(value=category_values)
-category_values_ent = custui.MyEntry(scatter_setup_fr, 
-                                     name='categories',
-                                     text=cat_val_var)
+# category_values = '(auto)'
+# cat_val_var = tk.StringVar(value=category_values)
+# category_values_ent = custui.MyEntry(scatter_setup_fr, 
+#                                      name='categories',
+#                                      text=cat_val_var)
 
 use_category_chkb.grid(row=0, column=0, padx=5, sticky='w')
 
@@ -883,6 +979,7 @@ category_lb.grid(row=1, column=0, padx=5, pady=10, sticky='w')
 
 label_cat_list.grid(row=0, column=1, padx=5, sticky='w')
 category_values_ent.grid(row=1, column=1, padx=5, pady=5, sticky='w')
+test_ent.grid(row=2, column=1, padx=5, pady=5, sticky='w')
 
 
 # global UI
@@ -911,32 +1008,20 @@ plot_label_fr.grid(row=1, column=1, padx=5, pady=5, sticky='nsew')
 
 btnq.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
 
+# inspect functions in this module
+# =================
+if do_profile:
+    import inspect
+    import sys
 
-# inspect functions
-import inspect
-functions = [data_unfilter]
-# fxn_names = [str(f) for f in functions]
-print(str(functions[0]))
-fxn_names = [inspect.getmodulename(f for f in functions]
-
-arg_spec = inspect.getfullargspec(functions[0])
-# print(f'NAMES   : {arg_spec[0]}')
-# print(f'*       : {arg_spec[1]}')
-# print(f'**      : {arg_spec[2]}')
-# print(f'defaults: {arg_spec[3]}')
-print()
-if arg_spec[3] is not None:
-    args_with_defaults = arg_spec[0][-len(arg_spec[3]):]
-    print(f'   args & defaults: {zip(args_with_defaults, arg_spec[3])}')
-# else:
-#     print(f'   arg names: {arg_spec[0]}')
-
-print()
-sig = (inspect.signature(functions[0]))
-print(f'   inspect {fxn_names[0]}: {sig}')
-print()
-
-
-
+    all_module_fxn = [obj for name, obj in inspect.getmembers(sys.modules[__name__]) 
+                        if (inspect.isfunction(obj) and
+                            obj.__module__ == __name__)]
+    for f in all_module_fxn:
+        print(f.__name__)
+        # parameter names and type hints
+        sig = (inspect.signature(f))
+        print(f'   signature: {sig}')
+    print()
 
 root.mainloop()
