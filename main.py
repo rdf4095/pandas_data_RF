@@ -93,15 +93,14 @@ history:
 05-25-2024  Eliminate the cat_val_var StringVar, since MyEntry creates its own.
 05-30-2024  Factor data_filter() into two parts: 1) construct data filter, 
             2) display filtered data.
+06-07-2024  Add apply_filter(), needed for future programmatic filter.
 
 TODO:
-    - use tkinter.font to control multiple Labels, and the '+' character
-    - does it make sense to separate "apply filter", so we can apply 
-      filters programmatically? (it's only one line.)
-    - filter setup now returns -1 if the filter failed. Can we read this
-      by replacing the button's command attribute with a bind()?
     - filter fxns use module variables. Can we pass these instead, to make
       the fxns more general-purpose?
+    - filter setup now returns -1 if the filter failed. Can we read this
+      by replacing the button's command attribute with a bind()?
+    - use tkinter.font to control multiple Labels, and the '+' character
 """
 
 import tkinter as tk
@@ -125,10 +124,7 @@ widget interaction functions
 ----------------------------
 """
 def style_df_text(win: object, itemlist: list=['test']) -> None:
-    """Apply text styling to pandas DataFrame (df) displayed in a Text widget.
-
-    The tag that is added is defined externally.
-    """
+    """Apply text styling to a pandas DataFrame displayed in a Text widget."""
     win.tag_add('bolded', '1.0', '1.end')
 
     for e in range(2, len(itemlist) + 2):
@@ -142,7 +138,7 @@ def style_df_text(win: object, itemlist: list=['test']) -> None:
 def set_use_category(varname: str):
     """Checkbutton callback: for scatter plot, use/don't use categories.
     
-    Select a row in the corresponding Listbox.
+    Selects a row in the corresponding Listbox.
     """
     do_cat = use_category.get()
 
@@ -168,7 +164,6 @@ def chkb_extra(ev):
 
 def create_criterion_row(datawin: object, statwin: object) -> object:
     """Add a new row of widgets for defining a data filter criterion."""
-
     nextrowframe = tk.Frame(filter_spec_fr, border=2, bg='cyan')
 
     var = tk.StringVar()
@@ -234,7 +229,7 @@ def add_criterion_row(datawin: object, statwin: object) -> None:
 def remove_criterion_row(n: object, datawin: object, statwin: object) -> None:
     """Remove a row of widgets for a filter criterion.
     
-       Data is automatically re-filtered by the remaining criteria.
+    Data is automatically re-filtered by the remaining criteria.
     """
     rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
     num_gridded = len(rows_gridded)
@@ -284,18 +279,15 @@ data interaction functions
 def clean_column_names(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     """Convert single spaces in column names to underscore character."""
 
-    # print(f'type df to clean: {type(df)}')
-    cols = df.columns
-    # print(f'cols: {cols}')
-    cols = cols.map(lambda x: x.replace(' ', '_') if isinstance(x, str) else x)
-    df.columns = cols
+    cols0 = df.columns
+    cols1 = cols0.map(lambda x: x.replace(' ', '_') if isinstance(x, str) else x)
+    df.columns = cols1
 
     return df
 
 
 def data_filter_ORIG(win: object, statwin: object) -> None:
     """Display a filtered version of the original DataFrame."""
-
     dcolumn = []
     criteria = []
     terms = []
@@ -388,8 +380,11 @@ def data_filter_ORIG(win: object, statwin: object) -> None:
 
 # new
 def data_filter(win, statwin):
-    d = make_filter()
-    show_filtered(win, statwin, d)
+    # d = make_filter()
+    # show_filtered(win, statwin, d)
+    expr = make_filter()
+    apply_filter(data_1, expr, win, statwin)
+    # show_filtered(win, statwin, d)
 
 # new
 def make_filter():
@@ -401,6 +396,7 @@ def make_filter():
 
     for i in range(len(filt_rows)):
         """query() requires cleaning column names.
+
         Another method would be to use a series of terms like: df[col] > 55.
         """
         current_term = ''
@@ -418,11 +414,11 @@ def make_filter():
             if validated_entry['value'] != '':
     
                 # test for numeric value.
-                # test: float will pass
+                # ...float will pass
                 if validated_entry['value'].replace('.', '', 1).isnumeric():
                     quote = ''
                 else:
-                    # string value
+                    # if string value
                     quote = '\"'
                     
                 current_term = dcolumn[current_criterion] + validated_entry['op'] + quote + validated_entry['value'] + quote
@@ -439,15 +435,16 @@ def make_filter():
         q_expression += (t + ' & ')
     q_expression = q_expression[:-3]
 
-    # print(f'filt columns: {dcolumn}')
-    # print(f'filt criteria: {criteria}')
     print(f'q_expression string: {repr(q_expression)}')
     print()
 
-    data_current = data_1.query(q_expression)
+    return q_expression
 
-    return data_current
-
+# new
+def apply_filter(d, expr, win, statwin):
+    data_current = d.query(expr)
+    show_filtered(win, statwin, data_current)
+    
 # new
 def show_filtered(win, statwin, data):
     win.configure(state='normal')
@@ -511,11 +508,9 @@ def validate_criterion(input):
 
 def data_unfilter(win, statwin, df):
     """Display the complete dataset."""
-
     # print(f'in data_unfilter, locals are: {locals().keys()}')
     # print()
 
-    # dfresult = df
     win.configure(state='normal')
     win.delete('1.0', tk.END)
     win.insert('1.0', df)
@@ -602,9 +597,8 @@ def scatter_plot(df: pd.DataFrame,
     catlist = ent.value_list
 
     # print(f'   catlist: {catlist}')
+    # if the user deletes the category list or manually enters 'auto'
     if catlist in [['auto'], ['']]:
-        # user must have deleted the category list or 
-        # entered 'auto'
         catlist = []
 
 
@@ -659,12 +653,12 @@ data_current = None
 # Read the dataset
 # ================
 # subset of 21 records
-data_1 = pd.read_csv('data/strain_nml_sample.csv')
+data_0 = pd.read_csv('data/strain_nml_sample.csv')
 
 # entire 91 records, slightly different columns
 # data_1 = pd.read_csv('data/strain_nml.csv')
 
-data_1 = clean_column_names(data_1)
+data_1 = clean_column_names(data_0)
 data_columns = list(data_1.columns)
 
 # to update the display after filtering
