@@ -20,9 +20,11 @@ history:
             Change value_list from a module var to a MyEntry class var, to allow
             each MyEntry instance to keep its own value.
 05-30-2024  Add docstrings to MyEntry class.
+06-09-2024  Standardize docstrings.
 """
 """
-TODO: clarify class parent, for docstring. use superclass or object parent?
+TODO: - Clarify class parent, for docstring. use superclass or object parent?
+      - What does it mean to 'extend' a class? re: class docstring
 """
 
 import sys
@@ -30,24 +32,42 @@ import tkinter as tk
 from tkinter import ttk
 
 this = sys.modules[__name__]
+# print(f'this is {this}')
+
 # this.value_list = None
 
 class MyEntry(ttk.Entry):
     """
-    MyEntry Class
-    Parent: ttk.Entry
+    MyEntry : Format the input text into a comma-separated list of strings.
 
-    Attributes:
-       textvariable: tk.StringVar
-       value_list: list
+    Extends ttk.Entry
 
-    Methods: set_cat_val_list
+    Attributes
+    ----------
+    textvariable : tk.StringVar
+    value_list : list
+
+    Methods
+    -------
+    set_cat_val_list:
+        Reads the list upon cursor leaving the Entry.
     """
     def __init__(self, parent,
                        name='',
                        text=''
                 ):
+        """
+        Inits a MyEntry object.
+
+        Parameters
+        ----------
+        name : str
+            widget name attribute
+        test : str
+            default string, or user-entered text
+        """
         super().__init__(parent,
+                         width=10,
                          exportselection=False)
         
         # self.name = kwargs['name']
@@ -70,44 +90,61 @@ class MyEntry(ttk.Entry):
 
 class FramedCombo(ttk.Frame):
     """
-    FramedCombo Class
-    Parent: ttk.Frame
+    FramedCombo : Defines a Frame, containing a Combobox and a Label.
 
-    Defines a Frame, containing a ttk.Combobox and a ttk.Label
+    Subclass of: ttk.Frame
 
-    Attributes:
-       label_name: str, text of the Label.
+    Attributes
+    ----------
+    label_name: str
+        text of the Label.
 
-    Child objects:
-       ttk.Label,
-       ttk.Combobox
-
-    Methods: create_widgets
+    Methods
+    -------
+    create_widgets:
+        pass
+    props:
+        pass
     """
     def __init__(self, parent, 
                        cb_values=['1', '2', '3'],
+                       display_name='',
+                       name='',
                        var=None,
                        posn=None,
-                       display_name='',
-                       name=''
+                       stick='w'
                  ):
         """
-        Inits FramedCombo
+        Inits a FramedCombo object.
 
-        Parameters:
-           cb_values: list, values passed through to the Combobox.
-           var: str, variable name.
-           posn: list, x and y position for packing child objects.
-           display_name: str, used to construct the text of the Label.
-           name: str, name attribute of the Combobox.
+        Parameters
+        ----------
+        cb_values : list
+            values passed through to the Combobox.
+        var : str
+            variable name.
+        posn : list
+            x and y position for packing child objects.
+        display_name : str
+            used to construct the text of the Label.
+        name : str
+            name attribute of the Combobox.
+
+        Methods
+        -------
+        create_widgets:
+            Creates and displays the widgets.
+        props:
+            Returns the parameter list for an instance of the class.
         """
         super().__init__(parent)
-
+        
         self.cb_values = cb_values
         self.var = var
         self.posn = posn
         self.display_name = display_name
         self.name = name
+        self.stick = stick
 
         self.sep = ': '
 
@@ -131,10 +168,10 @@ class FramedCombo(ttk.Frame):
                           )
         self.cb.current(0)
 
-        self.lab.pack(side='left', fill='x')
-        self.cb.pack(side='left', fill='x')
+        self.lab.pack(side='left')#, fill='x')
+        self.cb.pack(side='left')#, fill='x')
 
-        self.grid(row=self.posn[0], column=self.posn[1], padx=10)
+        self.grid(row=self.posn[0], column=self.posn[1], padx=5, sticky=self.stick)
 
     def props(self):
         """Return parameter list for the FramedCombo instance."""

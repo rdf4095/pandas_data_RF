@@ -15,68 +15,9 @@ author: Russell Folks
 history:
 -------
 11-29-2023  creation
-12-01-2023  Add explanatory print statements.
-12-03-2023  Refine comments. Modify print statements here and
-            in df_basics.py.
-12-08-2023  Add function to do basic operations with strain data,
-            and button to call it. Add kw param to bar_plot().
-            Refine inline comments.
-12-09-2023  Add parameters to scatter_plot(). Trim comments,
-            remove redundant examples.
-12-14-2023  Move some data display to strain_do_basics.py. Update comments.
-12-15-2023  Annotate function scatter_plot, and make it more robust by handling
-            the case of a missing category list.
-12-21-2023  Remove old comments.
-01-02-2024  Add output window in the UI, and show_males().
-01-04-2024  Highlight data header row, expand sample data file, change
-            show_males to data_filter, move simulation fxn to the
-            external file strain_test.py.
-01-05-2024  refactor scatter_plot().
-01-06-2024  Add Combobox to get the data column for line plot.
-01-10-2024  Add Radiobuttons for setting x and y data for a scatter plot.
-01-12-2024  Add unfilter() to display all data. Use radiobuttons to set scatter data,
-            using module-scope variables.
-01-20-2024  Read Combobox widgets to determine data column plotted (line, bar).
-01-22-2024  Begin UI for data filter options.
-01-23-2024  new GitHub repository.
-01-27-2024  Create all rows of the data filter in a loop.
-01-29-2024  Add validation function for filter criterion.
-02-06-2024  Rename some variables for consistency. verify both parts of filter are
-            nonempty. Move "all data" button to bottom of filter_ui frame.
-02-16-2024  Begin changing the plotting UI to grid geometry.
-02-17-2024  Remove commented .pack calls, and unnecessary variables.
-02-22-2024  Debug category setting for scatter plots. Remove commented-out code.
-            Update comments and TODO.
-02-23-2024  Scatter category now works.
-02-25-2024  Move scatterplot Entry widget to external module, myglobals.py.
-            More UI will be moved later. Rename data_items to data_columns.
-02-27-2024  Debug line and bar plot selection UI.
-02-28-2024  Renamed plotting_ui Frame to plotting_main. Moved line plot
-            and bar plot UI elements to a class in plotting_ui.py. This object
-            includes a Frame, Label and Combobox for selecting plot parameters.
-            Future: Verify we don't need select_plot_item() and then delete.
-03-03-2024  Remove commented code (before FramedCombo class.)
-            Remove select_plot_item().
-03-07-2024  Use FramedCombo class for scatter plot UI. Pass only tk.StringVars
-            to scatter_plot(). This is a step toward making the fxn generic.
-            Remove old radio button definition to a textfile to document how
-            it was done.
-03-10-2024  Debug add/delete filter row.
-03-18-2024  Finish debug of add/delete filter row. Add window to display result
-            of analysis (summary stats, stored query string, etc.)
-04-06-2024  Add window for numeric data.
-            Add vertical scrollbar (not working.) Delete old code.
-04-09-2024  Add scrollbar to stats window. Update parent Frame.
-04-11-2024  Rename output_win to data_win.
-04-16-2024  Change to rectangular root layout, using .grid(). Add Label to the
-            main data ui.
-04-19-2024  In plotting ui section, make variable names more consistent (use
-            widget name suffixes, e.g. fr = Frame.)
-04-22-2024  In filtering ui and statistics ui, revise variable names as above.
-04-27-2024  Update statistics window based on how the data is filtered. Move
-            styling of statistics window to function style_df_text. Rename
-            style tags for main data window. For scatterplot, accept category
-            value list upon mouseout of the Entry widget.
+
+...see: main_history.txt...
+
 05-04-2024  Add n, number of data rows, to statistics window. Remove some
             print statements.
             Filter criterion widget rows are added by passing arguments for
@@ -94,6 +35,11 @@ history:
 05-30-2024  Factor data_filter() into two parts: 1) construct data filter, 
             2) display filtered data.
 06-07-2024  Add apply_filter(), needed for future programmatic filter.
+06-11-2024  Bug fix: if data query expression is empty, don't call filter.
+            Remove some comments. Reformat scatter plot UI section.
+06-15-2024  Rename some vars in the plotting section. Slightly reconfigure
+            gridding of the scatterplot objects.
+06-19-2024  Remove data_filter_ORIG() to not_used.py. Trim history.
 
 TODO:
     - filter fxns use module variables. Can we pass these instead, to make
@@ -286,107 +232,15 @@ def clean_column_names(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     return df
 
 
-def data_filter_ORIG(win: object, statwin: object) -> None:
-    """Display a filtered version of the original DataFrame."""
-    dcolumn = []
-    criteria = []
-    terms = []
-    quote = ''
-    q_expression = ''
-
-    for i in range(len(filt_rows)):
-        """Another method, instead of query, would be to use a series of 
-        terms like: df[col] > 55. This doesn't require cleaning col names.
-        """
-        current_term = ''
-
-        this_filter = filt_rows[i].winfo_children()[0].get()
-        this_criterion = filt_rows[i].winfo_children()[1].get()
-        print(f'filt, crit: {this_filter}, {this_criterion}')
-
-        if this_filter != '' and this_criterion != '':
-
-            # dcolumn.append(filt_vars[i].get())
-            # criteria.append(criterion_vars[i].get())
-            dcolumn.append(this_filter)
-            criteria.append(this_criterion)
-
-            # print()
-
-            current_criterion = len(criteria) - 1
-            validated_entry = validate_criterion(criteria[current_criterion])
-            if validated_entry['value'] != '':
-    
-                # ? need this
-                # filter_term = validate_term(validated_entry)
-    
-                # test for numeric value.
-                # test: float will pass
-                if validated_entry['value'].replace('.', '', 1).isnumeric():
-                    quote = ''
-                else:
-                    # string value
-                    quote = '\"'
-                    
-                current_term = dcolumn[current_criterion] + validated_entry['op'] + quote + validated_entry['value'] + quote
-            else:
-                print('No valid criterion.')
-
-            terms.append(current_term)
-
-    if len(terms) == 0:
-        # no valid filter
-        return -1
-            
-    for t in terms:
-        q_expression += (t + ' & ')
-    q_expression = q_expression[:-3]
-
-    # print(f'filt columns: {dcolumn}')
-    # print(f'filt criteria: {criteria}')
-    print(f'q_expression string: {repr(q_expression)}')
-    print()
-
-    data_current = data_1.query(q_expression)
-
-    win.configure(state='normal')
-    win.delete('1.0', tk.END)
-
-    win.insert('1.0', data_current)
-    win.tag_add('redtext', '1.0', '1.end')
-    win.configure(state='disabled')
-
-    stats_agg = data_current.agg(stats_dict)
-    stat_win.configure(state='normal')
-    statwin.delete('1.0', tk.END)
-    with pd.option_context('display.float_format', '{:0.2f}'.format):
-        statwin.insert('1.0', stats_agg)
-
-    # statwin.tag_add('bolded', '1.0', '1.end')
-    style_df_text(statwin, stat_list)
-
-    nvalue = 'n = ' + str(data_current.count().iloc[0])
-    stat_n_lab.configure(text=nvalue)
-
-
-    # print('filtered stats:')
-    # print(f'data_current is\n {data_current}')
-    # print(f'stat_win is {stat_win}')
-    # print(f'stats_agg is\n {stats_agg}')
-    # print()
-
-    data_unfilter_btn.configure(style='MyButton1.TButton')
-    data_filter_btn.configure(style='Opt1_on.TButton')
-
-# new
 def data_filter(win, statwin):
     # d = make_filter()
     # show_filtered(win, statwin, d)
     expr = make_filter()
-    apply_filter(data_1, expr, win, statwin)
+    if expr != -1:
+        apply_filter(data_1, expr, win, statwin)
     # show_filtered(win, statwin, d)
 
-# new
+
 def make_filter():
     dcolumn = []
     criteria = []
@@ -440,12 +294,12 @@ def make_filter():
 
     return q_expression
 
-# new
+
 def apply_filter(d, expr, win, statwin):
     data_current = d.query(expr)
     show_filtered(win, statwin, data_current)
     
-# new
+
 def show_filtered(win, statwin, data):
     win.configure(state='normal')
     win.delete('1.0', tk.END)
@@ -465,6 +319,8 @@ def show_filtered(win, statwin, data):
 
     nvalue = 'n = ' + str(data.count().iloc[0])
     stat_n_lab.configure(text=nvalue)
+
+    data_filter_btn.configure(style='MyButton2.TButton')
 
 
 def validate_criterion(input):
@@ -527,7 +383,7 @@ def data_unfilter(win, statwin, df):
     nvalue = 'n = ' + str(data_current.count().iloc[0])
     stat_n_lab.configure(text=nvalue)
 
-    data_unfilter_btn.config(style = 'Opt2_on.TButton')
+    data_unfilter_btn.config(style = 'MyButton3.TButton')
     data_filter_btn.config(style = 'MyButton1.TButton')
 
 # func = data_unfilter
@@ -665,8 +521,8 @@ data_columns = list(data_1.columns)
 data_current = data_1
 
 
-# Display UI
-# ==========
+# Data Display UI
+# ===============
 data_ui = ttk.Frame(root, border=2, relief='raised')
 
 data_label = ttk.Label(data_ui, text='data:',
@@ -754,12 +610,6 @@ stats_agg = data_current.agg(stats_dict)
 nvalue = 'n = ' + str(data_current.count().iloc[0])
 stat_n_lab.configure(text=nvalue)
 
-# print('initial stats:')
-# print(f'data_current is\n {data_current}')
-# print(f'stat_win is {stat_win}')
-# print(f'stats_agg is\n {stats_agg}')
-# print()
-
 # Format floating point values
 # method 1: format for display but don't change the DataFrame
 with pd.option_context('display.float_format', '{:0.2f}'.format):
@@ -830,7 +680,7 @@ rowframe.grid(row=0, column=0, sticky='nw')
 data_unfilter_btn = ttk.Button(filter_ui,
                         text='show all data',
                         # style='MyButton2.TButton',
-                        style='Opt2_on.TButton',
+                        style='MyButton3.TButton',
                         command=lambda w=data_win, s=stat_win, d=data_1: data_unfilter(w, s, d))
 data_unfilter_btn.pack(side='bottom', pady=5)
 
@@ -850,7 +700,7 @@ line_data_x = tk.StringVar()
 line_data_y = tk.StringVar()
 
 btn_line_plot = ttk.Button(plotting_main,
-                text='Line plot',
+                text='Line',
                 command=lambda df=data_1, x=line_data_x, y=line_data_y: line_plot(df, x, y))
 
 line_x_fr = custui.FramedCombo(plotting_main,
@@ -877,7 +727,7 @@ bar_data_x = tk.StringVar()
 bar_data_y = tk.StringVar()
 
 btn_bar_plot = ttk.Button(plotting_main,
-               text='Bar plot',
+               text='Bar',
                command=lambda df=data_1, x=bar_data_x, y=bar_data_y: bar_plot(df, x, y))
 
 bar_x_fr = custui.FramedCombo(plotting_main,
@@ -889,7 +739,7 @@ bar_x_fr = custui.FramedCombo(plotting_main,
 
 bar_y_fr = custui.FramedCombo(plotting_main,
                               cb_values=data_columns[2:],
-                              display_name=x_text,
+                              display_name=y_text,
                               name='bar_y',
                               var=bar_data_y,
                               posn=[1,2])
@@ -903,33 +753,35 @@ scatter_setup_fr = ttk.Frame(plotting_main, border=2, relief='groove')
 category_values = 'auto'
 category_values_ent = custui.MyEntry(scatter_setup_fr, 
                                      name='categories',
-                                    #  text=cat_val_var)
                                      text=category_values)
 
-test_ent = custui.MyEntry(scatter_setup_fr, 
-                                     name='test_ent',                                    #  text=cat_val_var)
-                                     text='arbitrary')
+# test object placement
+# test_ent = custui.MyEntry(scatter_setup_fr, 
+#                           name='test_ent',                                    #  text=cat_val_var)
+#                           text='arbitrary')
 
-btn_scatter_plot = ttk.Button(plotting_main,
-                   text='Scatter plot',
+scatter_select_fr = ttk.Frame(scatter_setup_fr)
+
+scatter_plot_btn = ttk.Button(scatter_select_fr,
+                   text='Scatter',
+                   width=6,
                    command=lambda df=data_1, ent=category_values_ent, x=scatter_x, y=scatter_y: scatter_plot(df, ent, x, y)
+
                    )
 
-scatter_x_fr = custui.FramedCombo(plotting_main,
+scatter_x_fr = custui.FramedCombo(scatter_select_fr,
                                cb_values=data_columns[1:],
                                display_name=x_text,
                                name='scatter_x',
                                var=scatter_x,
-                               posn=[2,1])
+                               posn=[0,1])
 
-scatter_y_fr = custui.FramedCombo(plotting_main,
+scatter_y_fr = custui.FramedCombo(scatter_select_fr,
                                cb_values=data_columns[2:],
-                               display_name=x_text,
+                               display_name=y_text,
                                name='scatter_y',
                                var=scatter_y,
-                               posn=[2,2])
-
-# scatter_setup_fr = ttk.Frame(plotting_main, border=2, relief='groove')
+                               posn=[0,2])
 
 use_category = tk.IntVar(master=scatter_setup_fr, value = 0, name='use_category')
 use_category_chkb = ttk.Checkbutton(scatter_setup_fr,
@@ -961,19 +813,15 @@ category_lb.select_set(0)
 
 label_cat_list = tk.Label(scatter_setup_fr, text='with category values:')
 
-# category_values = '(auto)'
-# cat_val_var = tk.StringVar(value=category_values)
-# category_values_ent = custui.MyEntry(scatter_setup_fr, 
-#                                      name='categories',
-#                                      text=cat_val_var)
+scatter_select_fr.grid(row=0, column=0, columnspan=3, pady=10)
 
-use_category_chkb.grid(row=0, column=0, padx=5, sticky='w')
+use_category_chkb.grid(row=1, column=0,   padx=20,         sticky='w')
+category_lb.grid(row=2, column=0,         padx=20, pady=10, sticky='w')
+label_cat_list.grid(row=1, column=1,      padx=0,         sticky='w')
+category_values_ent.grid(row=2, column=1, padx=0, pady=10, sticky='w')
 
-category_lb.grid(row=1, column=0, padx=5, pady=10, sticky='w')
 
-label_cat_list.grid(row=0, column=1, padx=5, sticky='w')
-category_values_ent.grid(row=1, column=1, padx=5, pady=5, sticky='w')
-test_ent.grid(row=2, column=1, padx=5, pady=5, sticky='w')
+# test_ent.grid(row=3, column=1, padx=5, pady=5, sticky='w')
 
 
 # global UI
@@ -989,8 +837,14 @@ y_spacing = 5
 # plotting
 btn_line_plot.grid(row=0, column=0, padx=5, pady=y_spacing, sticky=tk.W)
 btn_bar_plot.grid(row=1, column=0, padx=5, pady=y_spacing, sticky=tk.W)
-btn_scatter_plot.grid(row=2, column=0, padx=5, pady=y_spacing, sticky=tk.W)
-scatter_setup_fr.grid(row=3, column=0, columnspan=3, padx=5, pady=y_spacing)
+
+
+scatter_setup_fr.grid(row=2, column=0, columnspan=3, padx=5, pady=y_spacing,
+                      ipadx=5, ipady=5)
+
+
+# scatter_plot_btn.grid(row=0, column=0, padx=5, pady=y_spacing, sticky=tk.W)
+scatter_plot_btn.grid(row=0, column=0, padx=5, sticky=tk.W)
 
 plotting_main.pack(padx=5, pady=5, fill='both')
 
