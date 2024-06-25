@@ -40,13 +40,14 @@ history:
 06-15-2024  Rename some vars in the plotting section. Slightly reconfigure
             gridding of the scatterplot objects.
 06-19-2024  Remove data_filter_ORIG() to not_used.py. Trim history.
+06-21-2024  Refine logic for validating filter criterion.
+06-25-2024  Pass filt_rows (list of frames w/ filter widgets) to data_filter().
+            In make_filter(), use var 'err' so as not to return from within
+            the body of an 'if'.
 
 TODO:
-    - filter fxns use module variables. Can we pass these instead, to make
-      the fxns more general-purpose?
-    - filter setup now returns -1 if the filter failed. Can we read this
-      by replacing the button's command attribute with a bind()?
     - use tkinter.font to control multiple Labels, and the '+' character
+    - add status bar to the bottom of the main window.
 """
 
 import tkinter as tk
@@ -232,16 +233,17 @@ def clean_column_names(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     return df
 
 
-def data_filter(win, statwin):
-    # d = make_filter()
-    # show_filtered(win, statwin, d)
-    expr = make_filter()
+def data_filter(win: object,
+                statwin: object, data_1: 
+                pd.core.frame.DataFrame, 
+                filters: list) -> None:
+    # print(f'filter list: {filters}')
+    expr = make_filter(filters)
     if expr != -1:
         apply_filter(data_1, expr, win, statwin)
-    # show_filtered(win, statwin, d)
 
 
-def make_filter():
+def make_filter(filt_rows: list) -> int | str:
     dcolumn = []
     criteria = []
     terms = []
@@ -251,9 +253,10 @@ def make_filter():
     for i in range(len(filt_rows)):
         """query() requires cleaning column names.
 
-        Another method would be to use a series of terms like: df[col] > 55.
+        Another method is to use a series of terms like: df[col] > 55.
         """
         current_term = ''
+        err = False
 
         this_filter = filt_rows[i].winfo_children()[0].get()
         this_criterion = filt_rows[i].winfo_children()[1].get()
@@ -264,7 +267,8 @@ def make_filter():
             criteria.append(this_criterion)
 
             current_criterion = len(criteria) - 1
-            validated_entry = validate_criterion(criteria[current_criterion])
+            validated_entry = validate_criterion(criteria[current_criterion],
+                                                 this_filter)
             if validated_entry['value'] != '':
     
                 # test for numeric value.
@@ -277,13 +281,16 @@ def make_filter():
                     
                 current_term = dcolumn[current_criterion] + validated_entry['op'] + quote + validated_entry['value'] + quote
             else:
-                print('No valid criterion.')
+                print('...no valid filter criterion.')
+                # return -1
+                err = True
 
             terms.append(current_term)
 
     if len(terms) == 0:
-        # no valid filter
-        return -1
+        print('...no filter defined.')
+        # return -1
+        err = True
             
     for t in terms:
         q_expression += (t + ' & ')
@@ -292,10 +299,15 @@ def make_filter():
     print(f'q_expression string: {repr(q_expression)}')
     print()
 
-    return q_expression
+    if err:
+        print('make_filter, returning -1')
+        return -1
+    else:
+        return q_expression
 
 
 def apply_filter(d, expr, win, statwin):
+
     data_current = d.query(expr)
     show_filtered(win, statwin, data_current)
     
@@ -323,39 +335,79 @@ def show_filtered(win, statwin, data):
     data_filter_btn.configure(style='MyButton2.TButton')
 
 
-def validate_criterion(input):
+def validate_criterion(input, data_column):
     char1 = input[0]
+    if len(input) > 1:
+        char2 = input[1]
+    else:
+        char2 = ''
     op = ''
-    op_end = -1
     value = ''
     
-    print()    # debug
-    criterion = {'op': '',
+    # dev & debug
+    print(f'vallidate input: {input}')
+    print()
+    criterion = {'op': op,
                  'value': value}
+    # op_eq = 0
 
-    if char1 in ['=', '>', '<']:
-        op_end = input.rfind('=')
-        if op_end > -1:
-            # op = input[:op_end + 1]
-            match op_end:
-                case 0:
-                    op = '=='
-                case 1:
-                    op = input[0:2]
-                case _:
-                    op = input[0:2]
-                    print(f'accepting nonstandard operator: {input[0:op_end + 1]} as: {op}')
+    # if char1 in ['=', '>', '<', '!']:
+    #     op_eq = input.rfind('=')
+    #     if op_eq > -1:
+    #         # op = input[:op_end + 1]
+    #         match op_eq:
+    #             case 0:
+    #                 op = '=='
+    #             case 1:
+    #                 op = input[0:2]
+    #             case _:
+    #                 op = input[0:2]
+    #                 print(f'accepting nonstandard operator: {input[0:op_eq + 1]} as: {op}')
 
-            value = input[op_end + 1:]
+    #         value = input[op_eq + 1:]
+    #     else:
+    #         if char1 == '!':
+    #             op = '!='
+    #         else:
+    #             op = input[0]
+    #         value = input[1:]
+    # else:
+    #     print('char1 value is not =, >, <')
+    #     op = '=='
+    #     value = input[op_eq + 1:]
+
+    print(f'char1, char2: {char1}, {char2}')
+
+    if char1 in ['!', '=', '>', '<']:
+        if char2 == '=':
+            # if input[2:].isnumeric():
+                value = input[2:]
+                op = input[0:2]
+            # else:
+            #     print(f'not a valid value: {input[2:]}')
         else:
-            op = input[0]
-            value = input[1:]
+            # if input[1:].isnumeric():
+                value = input[1:]
+                match char1:
+                    case '!': 
+                        op = '!='
+                    case '=': 
+                        op = '=='
+                    case _  : 
+                        op = char1
+            # else:
+                # op = '=='
+                # value = input[op_eq + 1:]
+                # print(f'not a valid value: {input[1:]}')
     else:
-        print('char1 value is text')
         op = '=='
-        value = input[op_end + 1:]
+        # value = input
+        print(f'setting filter criterion to: {data_column} {op} {value}')
 
-    # print(f'...in validate_criterion, value is: {value}')
+    print()
+    print(f'validated op, value: {op}, {value}')
+    print('---------')
+    print()
     criterion['op'] = op
     criterion['value'] = value
 
@@ -591,16 +643,17 @@ for c in data_1.columns:
 # stats_agg = data_1.agg(stats_dict)
 stats_agg = data_current.agg(stats_dict)
 
-# get the number of data rows that have a 'pt code' (which is all of them):
+# get the number of data rows that have a 'pt code' (all, in this dataset):
 # one way: the most succinct way that I can find, that uses a pandas function
 # ...The chosen way, since for this data, column 1 is guaranteed to contain
 # only real data, with no missing values.
 # print(f'items in data_current: {data_current.count().iloc[0]}')
 
-# a ssecond way: slightly more verbose
+# a second way: slightly more verbose
 # print(f'items in data_current: {data_current.iloc[:, 0].count()}')
 
-# a third way: depends on knowing the column header
+# a third way: needs the column header, which could be passed in
+# if this is a function
 # print(f'items in data_current: {data_current["pt_code"].count()}')
 
 # a fourth way: simplest, does not use a pandas function
@@ -629,6 +682,14 @@ style_df_text(stat_win, stat_list)
 
 # Data filtering UI
 # =================
+filt_rows = []
+filt_vars = []
+criterion_vars = []
+filt_cboxes = []
+filt_entries = []
+filt_buttons_add = []
+filt_buttons_subt = []
+
 filter_ui = ttk.Frame(root, border=2, relief='raised')
 
 filter_fr = ttk.Frame(filter_ui, border=2, relief='groove')
@@ -640,20 +701,20 @@ filter_lab.pack(anchor='w')
 data_filter_btn = ttk.Button(filter_fr,
                         text='criteria:',
                         style='MyButton1.TButton',
-                        command=lambda w=data_win, s=stat_win: data_filter(w, s))
+                        command=lambda w=data_win, s=stat_win, d=data_1, f=filt_rows: data_filter(w, s, d, f))
 
 data_filter_btn.pack(side='left', padx=5, pady=10)
 
 filter_spec_fr = tk.Frame(filter_fr, border=4, bg='yellow')
 filter_spec_fr.pack(side='left', padx=10, pady=10)
 
-filt_rows = []
-filt_vars = []
-criterion_vars = []
-filt_cboxes = []
-filt_entries = []
-filt_buttons_add = []
-filt_buttons_subt = []
+# filt_rows = []
+# filt_vars = []
+# criterion_vars = []
+# filt_cboxes = []
+# filt_entries = []
+# filt_buttons_add = []
+# filt_buttons_subt = []
 
 rowframe = create_criterion_row(data_win, stat_win)
 filter_spec_fr.grid_propagate(True)
@@ -848,11 +909,22 @@ scatter_plot_btn.grid(row=0, column=0, padx=5, sticky=tk.W)
 
 plotting_main.pack(padx=5, pady=5, fill='both')
 
+# status bar
+# ----------
+status_fr = ttk.Frame(root, relief='raised')
+status_lab = ttk.Label(status_fr, text='status: ')
+status_bar = ttk.Entry(status_fr, foreground='blue', background='#fc0')
+status_lab.pack(side='left')
+status_bar.pack()
+
+
 # main UI sections
 data_ui.grid(row=0, column=0, padx=5, pady=5, sticky='nsew')
 stat_ui.grid(row=1, column=0, padx=5, pady=5, sticky='nsew')
 filter_ui.grid(row=0, column=1, padx=5, pady=5, sticky='nsew')
 plot_label_fr.grid(row=1, column=1, padx=5, pady=5, sticky='nsew')
+
+status_fr.grid(row=2, column=0, columnspan=2)
 
 btnq.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
 

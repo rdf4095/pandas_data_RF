@@ -23,8 +23,7 @@ history:
 06-09-2024  Standardize docstrings.
 """
 """
-TODO: - Clarify class parent, for docstring. use superclass or object parent?
-      - What does it mean to 'extend' a class? re: class docstring
+TODO: 
 """
 
 import sys
@@ -38,9 +37,9 @@ this = sys.modules[__name__]
 
 class MyEntry(ttk.Entry):
     """
-    MyEntry : Format the input text into a comma-separated list of strings.
+    MyEntry : Entry widget expecting a comma-separated list of strings.
 
-    Extends ttk.Entry
+    Subclass of: ttk.Entry
 
     Attributes
     ----------
