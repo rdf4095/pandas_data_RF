@@ -39,7 +39,7 @@ class MyEntry(ttk.Entry):
     """
     MyEntry : Entry widget expecting a comma-separated list of strings.
 
-    Subclass of: ttk.Entry
+    Extends: ttk.Entry
 
     Attributes
     ----------
@@ -91,7 +91,7 @@ class FramedCombo(ttk.Frame):
     """
     FramedCombo : Defines a Frame, containing a Combobox and a Label.
 
-    Subclass of: ttk.Frame
+    Extends: ttk.Frame
 
     Attributes
     ----------

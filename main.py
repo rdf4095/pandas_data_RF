@@ -5,7 +5,7 @@ purpose: basic operations with pandas library
 
 comments: For Combobox and Listbox, exportselection=False is needed. Without this, 
           using the combo will clear the Listbox, generating a new ListboxSelect
-          event with no content (== error).
+          event with no content (an error).
           
           Pyarrow will become a required dependency of pandas in the next major 
           release of pandas (pandas 3.0)
@@ -44,10 +44,23 @@ history:
 06-25-2024  Pass filt_rows (list of frames w/ filter widgets) to data_filter().
             In make_filter(), use var 'err' so as not to return from within
             the body of an 'if'.
+06-27-2024  Implement status bar for user messages.
+07-02-2024  Implement do_debug flag. When set, print() variable values.
+            Bug fix: pass needed arguments to data_filter() if a rowframe
+            is deleted.
+07-04-2024  Allow filter to match a simple string w/o using the '==' operator.
 
 TODO:
+    - add fxn type hinting starting with apply_filter().
+    - for filter-related functions, have parameters in the same order,
+      e.g. dataframe, windows, other_stuff
+    - for function calls that change window (frame) content, combine data and
+      stats windows into a single object.  Allows more windows to be added w/o
+      changing the function signature.
+    - call set_status() at end of each fxn, unless there is a return value.
+    - add a header comment section explaining abbreviations used for variable
+      names and function names. Make sure these are consistent in code.
     - use tkinter.font to control multiple Labels, and the '+' character
-    - add status bar to the bottom of the main window.
 """
 
 import tkinter as tk
@@ -63,6 +76,7 @@ import rf_custom_ui as custui
 
 styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_module()
 
+do_debug = False      # turn on debug print statements
 do_profile = False    # report function signatures
 
 """ 
@@ -153,69 +167,74 @@ def add_criterion_row(datawin: object, statwin: object) -> None:
     """
     rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
     num_gridded = len(rows_gridded)
-    print(f'adding row (filt_rows: {len(filt_rows)})')
-    print(f'   {num_gridded} rows on grid:')
-    for r in rows_gridded:
-        print(f'   {r}')
-        # print(f'   row: {r.grid_info()["row"]}')
 
     if num_gridded == len(data_columns):
         return
 
     newrow = create_criterion_row(datawin, statwin)
-    print(f'   ...adding row {newrow} at row: {num_gridded}')
     filt_rows.append(newrow)
     newrow.grid(row=num_gridded, column=0, sticky='nw')
 
     for row in rows_gridded:
         row.winfo_children()[3].grid_remove()
 
-    print()
+    if do_debug:
+        print(f'adding row')
+        print(f'   {num_gridded} rows on grid:')
+        for r in rows_gridded:
+            print(f'   {r}')
+
+        print(f'   ...new row {newrow} at row: {num_gridded}')
+        print()
 
 
-def remove_criterion_row(n: object, datawin: object, statwin: object) -> None:
-    """Remove a row of widgets for a filter criterion.
+def remove_criterion_row(rowframe: object, 
+                         datawin: object, 
+                         statwin: object) -> None:
+    """Remove a row of widgets specifying a filter criterion.
     
     Data is automatically re-filtered by the remaining criteria.
     """
     rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
     num_gridded = len(rows_gridded)
 
-    print(f'removing row (filt_rows: {len(filt_rows)})')
-    print(f'   {num_gridded} rows on grid:')
-    for r in rows_gridded:
-        print(f'   {r}')
-
     # don't remove the only row
     if num_gridded == 1:
         return
     
-    rem = n.grid_info()
-    print(f'   removing row {rem["row"]}')
+    rem = rowframe.grid_info()
     # clear filter for the row
-    n.winfo_children()[0].set('')
-    n.winfo_children()[1].delete(0, tk.END)
+    rowframe.winfo_children()[0].set('')
+    rowframe.winfo_children()[1].delete(0, tk.END)
 
-    n.grid_forget()
-    filt_rows.remove(n)
+    rowframe.grid_forget()
+    filt_rows.remove(rowframe)
     
     for index, r in enumerate(filt_rows):
-        print(f'index, r: {index}, {r}')
+        # print(f'index, r: {index}, {r}')
         r.grid_forget()
         r.grid(row=index, column=0, sticky='nw')
     
     rows_now_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
-    num_now_gridded = len(rows_now_gridded)
-
-    print(f'   rows now on grid: {num_now_gridded}')
-    for index, r in enumerate(rows_now_gridded):
-        print(f'   {r}')
-        # r.rowconfigure(index, weight=1)
-    print()
-
     rows_now_gridded[-1].winfo_children()[3].grid(row=0, column=3, sticky='nw')
 
-    data_filter(datawin, statwin)
+    if do_debug:
+        print(f'removing row (filt_rows: {len(filt_rows)})')
+        print(f'   {num_gridded} rows on grid:')
+        for r in rows_gridded:
+            print(f'   {r}')
+        print(f'   removing row {rem["row"]}')
+        num_now_gridded = len(rows_now_gridded)
+        print(f'   {num_now_gridded} rows now on grid: ')
+        for index, r in enumerate(rows_now_gridded):
+            print(f'   {r}')
+        print()
+
+    data_filter(datawin, statwin, data_1, rows_gridded)
+
+
+def set_status(fs):
+    status_txt.set(fs)
 
 
 """ 
@@ -234,16 +253,24 @@ def clean_column_names(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
 
 
 def data_filter(win: object,
-                statwin: object, data_1: 
-                pd.core.frame.DataFrame, 
+                statwin: object,
+                data_1: pd.core.frame.DataFrame, 
                 filters: list) -> None:
-    # print(f'filter list: {filters}')
+    """Manage the construction and implementation of a dataset filter."""
+    # clear messages
+    set_status('')
+
     expr = make_filter(filters)
     if expr != -1:
         apply_filter(data_1, expr, win, statwin)
 
 
 def make_filter(filt_rows: list) -> int | str:
+    """Construct a dataset filter.
+    
+    The query() function requires cleaning column names. Another method
+    is to use a series of terms like: df[col] > 55.
+    """
     dcolumn = []
     criteria = []
     terms = []
@@ -251,10 +278,6 @@ def make_filter(filt_rows: list) -> int | str:
     q_expression = ''
 
     for i in range(len(filt_rows)):
-        """query() requires cleaning column names.
-
-        Another method is to use a series of terms like: df[col] > 55.
-        """
         current_term = ''
         err = False
 
@@ -281,7 +304,8 @@ def make_filter(filt_rows: list) -> int | str:
                     
                 current_term = dcolumn[current_criterion] + validated_entry['op'] + quote + validated_entry['value'] + quote
             else:
-                print('...no valid filter criterion.')
+                print(f'...not a valid filter criterion: {this_criterion}.')
+                set_status(f'Not a valid filter criterion: {this_criterion}')
                 # return -1
                 err = True
 
@@ -289,6 +313,7 @@ def make_filter(filt_rows: list) -> int | str:
 
     if len(terms) == 0:
         print('...no filter defined.')
+        set_status('No filter defined.')
         # return -1
         err = True
             
@@ -306,13 +331,19 @@ def make_filter(filt_rows: list) -> int | str:
         return q_expression
 
 
-def apply_filter(d, expr, win, statwin):
-
+def apply_filter(d: pd.core.frame.DataFrame, 
+                 expr: str, 
+                 win: object, 
+                 statwin: object) -> None:
+    """Apply a filter to a pandas DataFrame."""
     data_current = d.query(expr)
-    show_filtered(win, statwin, data_current)
+    show_filtered(data_current, win, statwin)
     
 
-def show_filtered(win, statwin, data):
+def show_filtered(data: pd.core.frame.DataFrame, 
+                  win: object, 
+                  statwin: object) -> None:
+    """Display results of filtering a dataset."""
     win.configure(state='normal')
     win.delete('1.0', tk.END)
 
@@ -321,7 +352,11 @@ def show_filtered(win, statwin, data):
     win.configure(state='disabled')
 
     stats_agg = data.agg(stats_dict)
-    stat_win.configure(state='normal')
+
+    print(f'type(stats_agg): {type(stats_agg)}')
+
+    # stat_win.configure(state='normal')
+    statwin.configure(state='normal')
     statwin.delete('1.0', tk.END)
     with pd.option_context('display.float_format', '{:0.2f}'.format):
         statwin.insert('1.0', stats_agg)
@@ -334,8 +369,12 @@ def show_filtered(win, statwin, data):
 
     data_filter_btn.configure(style='MyButton2.TButton')
 
+    if data.empty:
+        set_status('No data found.')
 
-def validate_criterion(input, data_column):
+
+def validate_criterion(input: list, data_column: int) -> dict:
+    """Validate user-entered criterion for filtering data."""
     char1 = input[0]
     if len(input) > 1:
         char2 = input[1]
@@ -344,72 +383,42 @@ def validate_criterion(input, data_column):
     op = ''
     value = ''
     
-    # dev & debug
-    print(f'vallidate input: {input}')
-    print()
     criterion = {'op': op,
                  'value': value}
-    # op_eq = 0
-
-    # if char1 in ['=', '>', '<', '!']:
-    #     op_eq = input.rfind('=')
-    #     if op_eq > -1:
-    #         # op = input[:op_end + 1]
-    #         match op_eq:
-    #             case 0:
-    #                 op = '=='
-    #             case 1:
-    #                 op = input[0:2]
-    #             case _:
-    #                 op = input[0:2]
-    #                 print(f'accepting nonstandard operator: {input[0:op_eq + 1]} as: {op}')
-
-    #         value = input[op_eq + 1:]
-    #     else:
-    #         if char1 == '!':
-    #             op = '!='
-    #         else:
-    #             op = input[0]
-    #         value = input[1:]
-    # else:
-    #     print('char1 value is not =, >, <')
-    #     op = '=='
-    #     value = input[op_eq + 1:]
-
-    print(f'char1, char2: {char1}, {char2}')
 
     if char1 in ['!', '=', '>', '<']:
         if char2 == '=':
-            # if input[2:].isnumeric():
                 value = input[2:]
                 op = input[0:2]
-            # else:
-            #     print(f'not a valid value: {input[2:]}')
         else:
-            # if input[1:].isnumeric():
-                value = input[1:]
-                match char1:
-                    case '!': 
-                        op = '!='
-                    case '=': 
-                        op = '=='
-                    case _  : 
-                        op = char1
-            # else:
-                # op = '=='
-                # value = input[op_eq + 1:]
-                # print(f'not a valid value: {input[1:]}')
+            value = input[1:]
+            match char1:
+                case '!': 
+                    op = '!='
+                case '=': 
+                    op = '=='
+                case _  : 
+                    op = char1
     else:
         op = '=='
-        # value = input
-        print(f'setting filter criterion to: {data_column} {op} {value}')
+        # TODO: was there a problem with assuming '== input'?
+        #       I assume a bad string will just find no match...
+        set_status(f'setting filter to match "{input}"')
+        value = input
 
-    print()
-    print(f'validated op, value: {op}, {value}')
-    print('---------')
-    print()
     criterion['op'] = op
     criterion['value'] = value
+
+    if do_debug:
+        print()
+        print(f'vallidate input: {input}')
+        print()
+        print(f'char1, char2: {char1}, {char2}')
+        if char1 not in ['!', '=', '>', '<']:
+            print(f'setting filter criterion to: {data_column} '==' {value}')
+        print(f'validated op, value: {op}, {value}')
+        print('---------')
+        print()
 
     return criterion
     
@@ -576,6 +585,7 @@ data_current = data_1
 # Data Display UI
 # ===============
 data_ui = ttk.Frame(root, border=2, relief='raised')
+# data_ui = ttk.Frame(root, style='alt.TFrame')
 
 data_label = ttk.Label(data_ui, text='data:',
                        style='BoldLabel.TLabel')
@@ -821,6 +831,9 @@ category_values_ent = custui.MyEntry(scatter_setup_fr,
 #                           name='test_ent',                                    #  text=cat_val_var)
 #                           text='arbitrary')
 
+# test
+# print(f'MyEntry name attr = {category_values_ent.name}')
+
 scatter_select_fr = ttk.Frame(scatter_setup_fr)
 
 scatter_plot_btn = ttk.Button(scatter_select_fr,
@@ -911,11 +924,14 @@ plotting_main.pack(padx=5, pady=5, fill='both')
 
 # status bar
 # ----------
-status_fr = ttk.Frame(root, relief='raised')
+status_fr = ttk.Frame(root, relief='groove')
 status_lab = ttk.Label(status_fr, text='status: ')
-status_bar = ttk.Entry(status_fr, foreground='blue', background='#fc0')
-status_lab.pack(side='left')
-status_bar.pack()
+
+status_txt = tk.StringVar()
+status_bar = ttk.Label(status_fr, textvariable=status_txt)
+
+status_lab.pack(side='left', padx=3, pady=3)
+status_bar.pack(side='left', padx=3, pady=3, expand=True, fill='both')
 
 
 # main UI sections
@@ -924,9 +940,9 @@ stat_ui.grid(row=1, column=0, padx=5, pady=5, sticky='nsew')
 filter_ui.grid(row=0, column=1, padx=5, pady=5, sticky='nsew')
 plot_label_fr.grid(row=1, column=1, padx=5, pady=5, sticky='nsew')
 
-status_fr.grid(row=2, column=0, columnspan=2)
+status_fr.grid(row=2, column=0, columnspan=2, padx=5, sticky='ew')
 
-btnq.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+btnq.grid(row=3, column=0, columnspan=2, padx=10, pady=10)
 
 # inspect functions in this module
 # =================
