@@ -18,22 +18,6 @@ history:
 
 ...see: main_history.txt...
 
-05-04-2024  Add n, number of data rows, to statistics window. Remove some
-            print statements.
-            Filter criterion widget rows are added by passing arguments for
-            the output windows (Text widgets).
-05-09-2024  Bug fix: when a filter row widget is removed, reset row numbers
-            for the remaining rows.
-05-16-2024  Small style changes: Bold the panel headings ('data' etc.), stats
-            padding & # rows.
-05-18-2024  Move 'not used' items to file not_used.py for archiving. Remove some
-            old commented lines. Re-arrange global objects definition order.
-05-20-2024  Cleaned up the 'inspect functions' section at the bottom, moved some
-            old code to not_used.py.
-05-22-2024  Debug the inspect section.
-05-25-2024  Eliminate the cat_val_var StringVar, since MyEntry creates its own.
-05-30-2024  Factor data_filter() into two parts: 1) construct data filter, 
-            2) display filtered data.
 06-07-2024  Add apply_filter(), needed for future programmatic filter.
 06-11-2024  Bug fix: if data query expression is empty, don't call filter.
             Remove some comments. Reformat scatter plot UI section.
@@ -49,24 +33,35 @@ history:
             Bug fix: pass needed arguments to data_filter() if a rowframe
             is deleted.
 07-04-2024  Allow filter to match a simple string w/o using the '==' operator.
-
+07-05-2024  Make parameter names and order consistent for filter functions,
+            and plotting functions.
+07-09-2024  Handle spurious characters in the data filter criterion. e.g. for
+            age >= 55, handle the typo 'g' in age >= g55.
+            Auto-get function name for debug print statements. See do_debug.
+            Move (almost) all prints to 'if do_debug' blocks in each fxn.
+07-15-2024  For all functions that access the two data display windows (Text
+            widgets) pass one dict of the two objects, not separate objects.
+"""
+"""
 TODO:
-    - add fxn type hinting starting with apply_filter().
-    - for filter-related functions, have parameters in the same order,
-      e.g. dataframe, windows, other_stuff
-    - for function calls that change window (frame) content, combine data and
-      stats windows into a single object.  Allows more windows to be added w/o
-      changing the function signature.
-    - call set_status() at end of each fxn, unless there is a return value.
-    - add a header comment section explaining abbreviations used for variable
-      names and function names. Make sure these are consistent in code.
-    - use tkinter.font to control multiple Labels, and the '+' character
+    1. Minor and style changes
+      a. add a header comment section explaining abbreviations used for variable
+         names and function names. Make sure these are consistent in code.
+      b. 07-15-2024: after next commit, remove old code w/ "data" and "stats"
+         window objects.
+
+    2. Major changes
+      a. use tkinter.font to control multiple Labels and other objects, and the 
+         '+' character
+      b. import styles from my styles_ttk.py and use for all ttk widgets.
 """
 
 import tkinter as tk
 from tkinter import ttk
 # import tkinter.font as tkfont
 from importlib.machinery import SourceFileLoader
+# to get function name and caller, for debug
+import sys
 
 import pandas as pd
 import numpy as np
@@ -96,18 +91,13 @@ def style_df_text(win: object, itemlist: list=['test']) -> None:
     win.configure(state='disabled')
 
 
-def set_use_category(varname: str):
+def set_use_category(varname: str) -> None:
     """Checkbutton callback: for scatter plot, use/don't use categories.
     
     Selects a row in the corresponding Listbox.
     """
     do_cat = use_category.get()
-
     do_cat_test = scatter_setup_fr.getvar(name=varname)
-
-    print('in set_use_category:')
-    print(f'   do_cat: {do_cat}')
-    print(f'   do_cat_test: {do_cat_test}')
 
     if int(do_cat) == 1:
         print('selecting category from list...')
@@ -117,13 +107,20 @@ def set_use_category(varname: str):
         category_lb.select_clear(1)
         category_lb.select_set(0)
 
+    if do_debug:
+        print(f'in function: {sys._getframe().f_code.co_name}')
+        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
+        print(f'   do_cat: {do_cat}')
+        print(f'   do_cat_test: {do_cat_test}')
+
 
 def chkb_extra(ev):
     print('in chkb_extra...')
     print(f'   ev: {ev}')
 
 
-def create_criterion_row(datawin: object, statwin: object) -> object:
+# def create_criterion_row(datawin: object, statwin: object) -> object:
+def create_criterion_row(windows: dict) -> object:
     """Add a new row of widgets for defining a data filter criterion."""
     nextrowframe = tk.Frame(filter_spec_fr, border=2, bg='cyan')
 
@@ -134,20 +131,24 @@ def create_criterion_row(datawin: object, statwin: object) -> object:
                            textvariable=var,
                            values=data_columns)
 
-    # filt_cb.bind('<<ComboboxSelected>>', select_filter_column)
-
     criterion = tk.StringVar()    
     entry = ttk.Entry(nextrowframe, width=7, textvariable=criterion)
 
     button_subt = ttk.Button(nextrowframe,
                              text='-',
                              width=1,
-                             command=lambda rf=nextrowframe, d=datawin, s=statwin: remove_criterion_row(rf, d, s))
+                            #  command=lambda rf=nextrowframe,
+                            #                 d=windows["data"], 
+                            #                 s=windows["stats"]: remove_criterion_row(rf, d, s))
+                             command=lambda rf=nextrowframe,
+                                            w=windows: remove_criterion_row(rf, w))
+                            #  command=lambda: remove_criterion_row(nextrowframe, windows))
 
     button_add = ttk.Button(nextrowframe,
                             text='+',
                             width=1,
-                            command=lambda d=datawin, s=statwin: add_criterion_row(d, s))
+                            command=lambda w=windows: add_criterion_row(w))
+                            # command=lambda: add_criterion_row(windows))
     
     filt_cb.grid(row=0, column=0)
     entry.grid(row=0, column=1)
@@ -160,7 +161,8 @@ def create_criterion_row(datawin: object, statwin: object) -> object:
     return nextrowframe
 
 
-def add_criterion_row(datawin: object, statwin: object) -> None:
+# def add_criterion_row(datawin: object, statwin: object) -> None:
+def add_criterion_row(windows: dict) -> None:
     """Add a row of widgets to define a filter criterion.
     
     The 'criteria' button must be used to filter with the new criterion.
@@ -171,7 +173,7 @@ def add_criterion_row(datawin: object, statwin: object) -> None:
     if num_gridded == len(data_columns):
         return
 
-    newrow = create_criterion_row(datawin, statwin)
+    newrow = create_criterion_row(windows)
     filt_rows.append(newrow)
     newrow.grid(row=num_gridded, column=0, sticky='nw')
 
@@ -179,6 +181,8 @@ def add_criterion_row(datawin: object, statwin: object) -> None:
         row.winfo_children()[3].grid_remove()
 
     if do_debug:
+        print(f'in function: {sys._getframe().f_code.co_name}')
+        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
         print(f'adding row')
         print(f'   {num_gridded} rows on grid:')
         for r in rows_gridded:
@@ -188,9 +192,10 @@ def add_criterion_row(datawin: object, statwin: object) -> None:
         print()
 
 
-def remove_criterion_row(rowframe: object, 
-                         datawin: object, 
-                         statwin: object) -> None:
+# def remove_criterion_row(rowframe: object, 
+#                          datawin: object, 
+#                          statwin: object) -> None:
+def remove_criterion_row(rowframe: object, windows: dict) -> None:
     """Remove a row of widgets specifying a filter criterion.
     
     Data is automatically re-filtered by the remaining criteria.
@@ -202,7 +207,9 @@ def remove_criterion_row(rowframe: object,
     if num_gridded == 1:
         return
     
-    rem = rowframe.grid_info()
+    # rem = rowframe.grid_info()
+    # print(f'rem is: {rem}')
+
     # clear filter for the row
     rowframe.winfo_children()[0].set('')
     rowframe.winfo_children()[1].delete(0, tk.END)
@@ -219,6 +226,8 @@ def remove_criterion_row(rowframe: object,
     rows_now_gridded[-1].winfo_children()[3].grid(row=0, column=3, sticky='nw')
 
     if do_debug:
+        print(f'in function: {sys._getframe().f_code.co_name}')
+        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
         print(f'removing row (filt_rows: {len(filt_rows)})')
         print(f'   {num_gridded} rows on grid:')
         for r in rows_gridded:
@@ -230,11 +239,13 @@ def remove_criterion_row(rowframe: object,
             print(f'   {r}')
         print()
 
-    data_filter(datawin, statwin, data_1, rows_gridded)
+    # data_filter(data_1, datawin, statwin, rows_gridded)
+    data_filter(data_1, windows, rows_gridded)
 
 
-def set_status(fs):
-    status_txt.set(fs)
+def set_status(status_msg):
+    # print('in set_status...')
+    status_txt.set(status_msg)
 
 
 """ 
@@ -252,39 +263,49 @@ def clean_column_names(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     return df
 
 
-def data_filter(win: object,
-                statwin: object,
-                data_1: pd.core.frame.DataFrame, 
+# def data_filter(data: pd.core.frame.DataFrame, 
+#                 win: object,
+#                 statwin: object,
+#                 filters: list) -> None:
+def data_filter(data: pd.core.frame.DataFrame, 
+                windows: dict,
                 filters: list) -> None:
     """Manage the construction and implementation of a dataset filter."""
-    # clear messages
-    set_status('')
+    expr = make_filter(data, filters)
+    # if expr != -1:
+    if expr not in [-1, -2]:
+        apply_filter(data, expr, windows)
+    else:
+        match expr:
+            case -1:
+                msg = f'Not a valid filter criterion: {expr}'
+            case -2:
+                data_unfilter(data, windows)
+                msg = 'No filter defined.'
+            case _ :
+                apply_filter(data, expr, windows)
 
-    expr = make_filter(filters)
-    if expr != -1:
-        apply_filter(data_1, expr, win, statwin)
+
+    # set_status('')
 
 
-def make_filter(filt_rows: list) -> int | str:
-    """Construct a dataset filter.
-    
-    The query() function requires cleaning column names. Another method
-    is to use a series of terms like: df[col] > 55.
-    """
+def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
+    """Construct a data filter for a pandas DataFrame."""
     dcolumn = []
     criteria = []
     terms = []
     quote = ''
+    msg = None
+    err = 0      # False
     q_expression = ''
 
     for i in range(len(filt_rows)):
         current_term = ''
-        err = False
+        # err = False
 
         this_filter = filt_rows[i].winfo_children()[0].get()
         this_criterion = filt_rows[i].winfo_children()[1].get()
-        print(f'filt, crit: {this_filter}, {this_criterion}')
-
+        
         if this_filter != '' and this_criterion != '':
             dcolumn.append(this_filter)
             criteria.append(this_criterion)
@@ -292,77 +313,93 @@ def make_filter(filt_rows: list) -> int | str:
             current_criterion = len(criteria) - 1
             validated_entry = validate_criterion(criteria[current_criterion],
                                                  this_filter)
+            the_op = validated_entry['op']
+            the_value = validated_entry['value']
+            the_type = data[this_filter].dtype
+
             if validated_entry['value'] != '':
     
                 # test for numeric value.
                 # ...float will pass
-                if validated_entry['value'].replace('.', '', 1).isnumeric():
+                # if validated_entry['value'].replace('.', '', 1).isnumeric():
+                if the_value.replace('.', '', 1).isnumeric():
                     quote = ''
                 else:
                     # if string value
+                    if the_type == 'int64':
+                        msg = f'Cannot compare "{the_value}" to numeric data.'
+                        err = True
+
                     quote = '\"'
                     
-                current_term = dcolumn[current_criterion] + validated_entry['op'] + quote + validated_entry['value'] + quote
+                current_term = dcolumn[current_criterion] + the_op + quote + the_value + quote
             else:
-                print(f'...not a valid filter criterion: {this_criterion}.')
-                set_status(f'Not a valid filter criterion: {this_criterion}')
-                # return -1
-                err = True
+                # msg = f'Not a valid filter criterion: {this_criterion}'
+                err = -1
 
             terms.append(current_term)
 
     if len(terms) == 0:
-        print('...no filter defined.')
-        set_status('No filter defined.')
-        # return -1
-        err = True
+        # msg = 'No filter defined.'
+        err = -2
             
     for t in terms:
         q_expression += (t + ' & ')
     q_expression = q_expression[:-3]
 
-    print(f'q_expression string: {repr(q_expression)}')
-    print()
+    # if msg != None:
+    #     set_status(msg)
+
+    if do_debug:
+        print(f'in function: {sys._getframe().f_code.co_name}')
+        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
+        print(f'filt, crit: {this_filter}, {this_criterion}')
+        print()
+        print(f'column {this_filter} contains type: {the_type}')
+        print(the_type in ['str', 'object', 'int64'])
+        print(f'q_expression string: {repr(q_expression)}')
+        print()
+
 
     if err:
-        print('make_filter, returning -1')
-        return -1
+        print(f'make_filter, returning {err}')
+        return err
     else:
         return q_expression
 
 
-def apply_filter(d: pd.core.frame.DataFrame, 
+# def apply_filter(data: pd.core.frame.DataFrame, 
+#                  expr: str, 
+#                  win: object, 
+#                  statwin: object) -> None:
+def apply_filter(data: pd.core.frame.DataFrame, 
                  expr: str, 
-                 win: object, 
-                 statwin: object) -> None:
-    """Apply a filter to a pandas DataFrame."""
-    data_current = d.query(expr)
-    show_filtered(data_current, win, statwin)
+                 windows: dict) -> None:
+    """Apply a data filter to a pandas DataFrame.
+
+    The query() function requires cleaning column names. Another method
+    is to use a series of terms like: df[col] > 55.
+    """
+    data_current = data.query(expr)
+    show_filtered(data_current, windows)
     
 
 def show_filtered(data: pd.core.frame.DataFrame, 
-                  win: object, 
-                  statwin: object) -> None:
+                  windows: dict) -> None:
     """Display results of filtering a dataset."""
-    win.configure(state='normal')
-    win.delete('1.0', tk.END)
-
-    win.insert('1.0', data)
-    win.tag_add('redtext', '1.0', '1.end')
-    win.configure(state='disabled')
+    windows["data"].configure(state='normal')
+    windows["data"].delete('1.0', tk.END)
+    windows["data"].insert('1.0', data)
+    windows["data"].tag_add('redtext', '1.0', '1.end')
+    windows["data"].configure(state='disabled')
 
     stats_agg = data.agg(stats_dict)
-
-    print(f'type(stats_agg): {type(stats_agg)}')
-
-    # stat_win.configure(state='normal')
-    statwin.configure(state='normal')
-    statwin.delete('1.0', tk.END)
+    windows["stats"].configure(state='normal')
+    windows["stats"].delete('1.0', tk.END)
     with pd.option_context('display.float_format', '{:0.2f}'.format):
-        statwin.insert('1.0', stats_agg)
+        windows["stats"].insert('1.0', stats_agg)
 
-    # statwin.tag_add('bolded', '1.0', '1.end')
-    style_df_text(statwin, stat_list)
+    style_df_text(windows["stats"], stat_list)
 
     nvalue = 'n = ' + str(data.count().iloc[0])
     stat_n_lab.configure(text=nvalue)
@@ -382,6 +419,7 @@ def validate_criterion(input: list, data_column: int) -> dict:
         char2 = ''
     op = ''
     value = ''
+    msg = ''
     
     criterion = {'op': op,
                  'value': value}
@@ -401,16 +439,15 @@ def validate_criterion(input: list, data_column: int) -> dict:
                     op = char1
     else:
         op = '=='
-        # TODO: was there a problem with assuming '== input'?
-        #       I assume a bad string will just find no match...
-        set_status(f'setting filter to match "{input}"')
+        msg = f'setting filter to match "{input}"'
         value = input
 
     criterion['op'] = op
     criterion['value'] = value
 
     if do_debug:
-        print()
+        print(f'in function: {sys._getframe().f_code.co_name}')
+        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
         print(f'vallidate input: {input}')
         print()
         print(f'char1, char2: {char1}, {char2}')
@@ -420,104 +457,108 @@ def validate_criterion(input: list, data_column: int) -> dict:
         print('---------')
         print()
 
+    set_status(msg)
+    
     return criterion
     
 
-def data_unfilter(win, statwin, df):
+def data_unfilter(data: pd.core.frame.DataFrame, 
+                  windows: dict) -> None:
     """Display the complete dataset."""
-    # print(f'in data_unfilter, locals are: {locals().keys()}')
-    # print()
-
-    win.configure(state='normal')
-    win.delete('1.0', tk.END)
-    win.insert('1.0', df)
-    win.tag_add('bluetext', '1.0', '1.end')
+    windows["data"].configure(state='normal')
+    windows["data"].delete('1.0', tk.END)
+    windows["data"].insert('1.0', data)
+    windows["data"].tag_add('bluetext', '1.0', '1.end')
+    windows["data"].configure(state='disabled')
 
     stats_agg = data_current.agg(stats_dict)
-    statwin.configure(state='normal')
-    statwin.delete('1.0', tk.END)
+    windows["stats"].configure(state='normal')
+    windows["stats"].delete('1.0', tk.END)
     with pd.option_context('display.float_format', '{:0.2f}'.format):
-        statwin.insert('1.0', stats_agg)
+        windows["stats"].insert('1.0', stats_agg)
 
-    style_df_text(statwin, stat_list)
+    style_df_text(windows["stats"], stat_list)
 
     nvalue = 'n = ' + str(data_current.count().iloc[0])
     stat_n_lab.configure(text=nvalue)
 
-    data_unfilter_btn.config(style = 'MyButton3.TButton')
-    data_filter_btn.config(style = 'MyButton1.TButton')
+    data_unfilter_btn.configure(style = 'MyButton3.TButton')
+    data_filter_btn.configure(style = 'MyButton1.TButton')
 
-# func = data_unfilter
-# print(f'in data_unfilter, __code__ params are:')
-# print(f'    co_varnames: {func.__code__.co_varnames}')
-# print(f'    co_argcount: {func.__code__.co_argcount}')
-# print(f'    co_nlocals: {func.__code__.co_nlocals}')
-# print()
+    if do_debug:
+        print(f'in function: {sys._getframe().f_code.co_name}')
+        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
+        print(f'locals are: {locals().keys()}')
+        func = data_unfilter
+        print(f'    co_varnames: {func.__code__.co_varnames}')
+        print(f'    co_argcount: {func.__code__.co_argcount}')
+        print(f'    co_nlocals: {func.__code__.co_nlocals}')
+        print()
 
 
-def line_plot(df: pd.DataFrame,
+def line_plot(data: pd.DataFrame,
               xcol: tk.StringVar,
               ycol: tk.StringVar) -> None:
-    """Create line plot (the default) for input df."""
-
+    """Create line plot (the default) for input data."""
     xdata = xcol.get()
     ydata = ycol.get()
-    dfsort = df.sort_values(by=xdata)
+    sorted = data.sort_values(by=xdata)
 
-    print('line_plot params:')
-    print(f'   xcol: {xcol} = {xdata}')
-    print(f'   ycol: {ycol} = {ydata}')
-    print()
-
-    # ? use df.plot.line for clarity
-    # df.plot(x=xcol, y=ydata)
-    dfsort.plot(x=xdata, y=ydata)
+    # ? or use data.plot.line for explicitness
+    sorted.plot(x=xdata, y=ydata)
     plt.show()
 
+    if do_debug:
+        print(f'in function: {sys._getframe().f_code.co_name}')
+        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
+        print('line_plot params:')
+        print(f'   xcol: {xcol} = {xdata}')
+        print(f'   ycol: {ycol} = {ydata}')
+        print()
 
-def bar_plot(df: pd.DataFrame,
+
+def bar_plot(data: pd.DataFrame,
              xcol: tk.StringVar,
              ycol: tk.StringVar) -> None:
-    """Create bar plot for input df."""
+    """Create bar plot for input data."""
 
     xdata = xcol.get()
     ydata = ycol.get()
-    dfsort = df.sort_values(by=xdata)
-
-    print('bar_plot params:')
-    print(f'   xcol: {xcol} = {xdata}')
-    print(f'   ycol: {ycol} = {ydata}')
-    print()
+    dfsort = data.sort_values(by=xdata)
 
     dfsort.plot.bar(x=xdata, y=ydata)
     plt.show()
 
+    if do_debug:
+        print(f'in function: {sys._getframe().f_code.co_name}')
+        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
+        print('bar_plot params:')
+        print(f'   xcol: {xcol} = {xdata}')
+        print(f'   ycol: {ycol} = {ydata}')
+        print()
 
-def scatter_plot(df: pd.DataFrame, 
+
+def scatter_plot(data: pd.DataFrame, 
                  ent: object,
                  x_variable: tk.StringVar,
                  y_variable: tk.StringVar) -> None:
-    """Create scatter plot for input df.
+    """Create scatter plot for input data.
     
     Makes a copy of the DataFrame object passed in, to avoid mutating it.
     """
-    df2 = pd.DataFrame(df)
+    data_copy = pd.DataFrame(data)
     plot_data = None
 
     source = {'x': x_variable.get(),
               'y': y_variable.get()}
-    # print(f"source x,y: {source['x']}, {source['y']}")
 
     category = category_lb.get(category_lb.curselection())
 
-    # catlist = custui.value_list
     catlist = ent.value_list
 
-    # print(f'   catlist: {catlist}')
     # if the user deletes the category list or manually enters 'auto'
     if catlist in [['auto'], ['']]:
         catlist = []
-
 
     def create_plot(data, cat):
         data.plot.scatter(x=source['x'],
@@ -529,14 +570,14 @@ def scatter_plot(df: pd.DataFrame,
     if category:
         if ((not catlist) or catlist == None or (not isinstance(catlist, list))):
             print('\nWARNING: no category list; finding category values...\n')
-            df2[category] = df2[category].astype('category')
-            plot_data = df2
+            data_copy[category] = data_copy[category].astype('category')
+            plot_data = data_copy
         else:
             # print('if category else...')
-            df2[category] = pd.Categorical(df2[category], categories=catlist, ordered=False)    
-            plot_data = df2[df2[category].isin(catlist)]
+            data_copy[category] = pd.Categorical(data_copy[category], categories=catlist, ordered=False)    
+            plot_data = data_copy[data_copy[category].isin(catlist)]
     else:
-        plot_data = df2
+        plot_data = data_copy
         category = None
 
     create_plot(plot_data, category)
@@ -561,6 +602,10 @@ category_values_ent = None
 data_columns = ["gender", "age", "TID", "stress EF", "rest EF"]
 line_data_source = 'age'
 bar_data_source = 'TID'
+
+# text widgets
+windows = {'data': None,
+           'stats': None}
 
 x_text = 'x'
 y_text = 'y'
@@ -597,22 +642,20 @@ data_win = tk.Text(data_ui, width=50, height=15,
                    borderwidth=2,
                    relief='sunken',
                    name='datawin')
+windows["data"] = data_win
 
 data_win.tag_configure("bluetext", foreground='blue')
 data_win.tag_configure("redtext", foreground='red')
+data_win.tag_add('bluetext', '1.0', '1.end')
 
-data_win.pack(padx=10, pady=5, fill='x', expand=True)
-
-# data_win.insert('1.0', data_1)
 data_win.insert('1.0', data_current)
 data_win.configure(state='disabled')
 
-# ("1.0 lineend" also works for end-of-line)
-data_win.tag_add('bluetext', '1.0', '1.end')
+data_win.pack(side='left', pady=5, fill='x', expand=True)
 
 data_scroll = ttk.Scrollbar(data_ui, orient='vertical', command=data_win.yview)
-data_win.pack(side='left', pady=5, fill='x', expand=True)
 data_scroll.pack(side='right', fill='y', pady=5)
+
 data_win['yscrollcommand'] = data_scroll.set
 
 
@@ -635,6 +678,7 @@ stat_win = tk.Text(stat_ui, width=50, height=10,
                      font=('Courier New', 14),
                      borderwidth=2,
                      relief='sunken', name='statwin')
+windows["stats"] = stat_win
 
 stat_scroll = ttk.Scrollbar(stat_ui, orient='vertical', command=stat_win.yview)
 stat_win.pack(side='left', padx=10, pady=5, fill='x', expand=True)
@@ -653,22 +697,23 @@ for c in data_1.columns:
 # stats_agg = data_1.agg(stats_dict)
 stats_agg = data_current.agg(stats_dict)
 
-# get the number of data rows that have a 'pt code' (all, in this dataset):
-# one way: the most succinct way that I can find, that uses a pandas function
-# ...The chosen way, since for this data, column 1 is guaranteed to contain
-# only real data, with no missing values.
+# get the number of data rows that have a 'pt code' (i.e. are valid records):
+# method 1: the chosen method, the most succinct way I can find that uses
+# a pandas function. Makes 2 assumptions, both of which are true for the
+# present use case:
+#   - 'pt code' is in column 1
+#   -  all rows (records) have a 'pt code' -- no missing values.
 # print(f'items in data_current: {data_current.count().iloc[0]}')
 
-# a second way: slightly more verbose
+# method 2: does the count() a different way
 # print(f'items in data_current: {data_current.iloc[:, 0].count()}')
 
-# a third way: needs the column header, which could be passed in
-# if this is a function
+# method 3: doesn't assume column 1, and so needs the column header ('pt code'), 
+# which could be passed in if this is a function. This is more generic,
 # print(f'items in data_current: {data_current["pt_code"].count()}')
 
-# a fourth way: simplest, does not use a pandas function
+# method 4: simple, does not use a pandas function
 # print(f'items in data_current: {len(data_current)}')
-
 
 nvalue = 'n = ' + str(data_current.count().iloc[0])
 stat_n_lab.configure(text=nvalue)
@@ -678,14 +723,17 @@ stat_n_lab.configure(text=nvalue)
 with pd.option_context('display.float_format', '{:0.2f}'.format):
     stat_win.insert('1.0', stats_agg)
 
-# method 2: create a new DataFrame with formatted values
-# stats_agg_format = stats_agg.map('{:0.2f}'.format)
+# method 2: create a new DataFrame with formatted values.
+# Preserves stats for the whole dataset, for possible later conparison to
+# stats for a filtered dataset.
+stats_agg_format = stats_agg.map('{:0.2f}'.format)
 # stat_win.insert('1.0', stats_agg_format)
 
 # method 3: use the default styler object
 # TODO
 
 stat_win.tag_configure("bolded", font=('Courier New', 14, 'bold'))
+
 
 style_df_text(stat_win, stat_list)
 
@@ -711,28 +759,22 @@ filter_lab.pack(anchor='w')
 data_filter_btn = ttk.Button(filter_fr,
                         text='criteria:',
                         style='MyButton1.TButton',
-                        command=lambda w=data_win, s=stat_win, d=data_1, f=filt_rows: data_filter(w, s, d, f))
+                        # command=lambda d=data_1, 
+                        #                w=data_win, 
+                        #                s=stat_win, 
+                        #                f=filt_rows: data_filter(d, w, s, f))
+                        command=lambda d=data_1, 
+                                       w=windows, 
+                                       f=filt_rows: data_filter(d, w, f))
 
 data_filter_btn.pack(side='left', padx=5, pady=10)
 
 filter_spec_fr = tk.Frame(filter_fr, border=4, bg='yellow')
 filter_spec_fr.pack(side='left', padx=10, pady=10)
 
-# filt_rows = []
-# filt_vars = []
-# criterion_vars = []
-# filt_cboxes = []
-# filt_entries = []
-# filt_buttons_add = []
-# filt_buttons_subt = []
-
-rowframe = create_criterion_row(data_win, stat_win)
+rowframe = create_criterion_row(windows)
 filter_spec_fr.grid_propagate(True)
 
-# print(f'cb     filt: {rowframe.winfo_children()[0]}')
-# print(f'entry  crit: {rowframe.winfo_children()[1]}')
-# print(f'button -: {rowframe.winfo_children()[2]}')
-# print(f'button +: {rowframe.winfo_children()[3]}')
 filt_rows.append(rowframe)
 
 filt_cboxes.append(rowframe.winfo_children()[0])
@@ -740,19 +782,17 @@ filt_entries.append(rowframe.winfo_children()[1])
 filt_buttons_subt.append(rowframe.winfo_children()[2])
 filt_buttons_add.append(rowframe.winfo_children()[3])
 
-# filt_rows[0].grid(row=0, column=0, sticky='nw')
 rowframe.grid(row=0, column=0, sticky='nw')
-
-
-# print(f'filt_rows[0] grid info: {filt_rows[0].grid_info()}')
-# print(f'filt_rows[1] grid info: {filt_rows[1].grid_info()}')
-# print(f'   items: {filt_rows[1].grid_info().items}')
 
 data_unfilter_btn = ttk.Button(filter_ui,
                         text='show all data',
                         # style='MyButton2.TButton',
                         style='MyButton3.TButton',
-                        command=lambda w=data_win, s=stat_win, d=data_1: data_unfilter(w, s, d))
+                        # command=lambda d=data_1, 
+                        #                w=data_win, 
+                        #                s=stat_win: data_unfilter(d, w, s))
+                        command=lambda d=data_1, 
+                                       w=windows: data_unfilter(d, w))
 data_unfilter_btn.pack(side='bottom', pady=5)
 
 filter_fr.pack(padx=10, pady=10, fill='both')
@@ -826,7 +866,7 @@ category_values_ent = custui.MyEntry(scatter_setup_fr,
                                      name='categories',
                                      text=category_values)
 
-# test object placement
+# test object placement on the UI
 # test_ent = custui.MyEntry(scatter_setup_fr, 
 #                           name='test_ent',                                    #  text=cat_val_var)
 #                           text='arbitrary')
@@ -948,7 +988,7 @@ btnq.grid(row=3, column=0, columnspan=2, padx=10, pady=10)
 # =================
 if do_profile:
     import inspect
-    import sys
+    # import sys
 
     all_module_fxn = [obj for name, obj in inspect.getmembers(sys.modules[__name__]) 
                         if (inspect.isfunction(obj) and
