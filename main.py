@@ -41,14 +41,21 @@ history:
             Move (almost) all prints to 'if do_debug' blocks in each fxn.
 07-15-2024  For all functions that access the two data display windows (Text
             widgets) pass one dict of the two objects, not separate objects.
+07-21-2024  Refine data filter to handle mismatched filter and data types.
+            Initial implementation of multi-select UI as an external module.
+            This is code that was previously in this module, and will be
+            removed after debug.
+            multi-select = rows of frames, each with drop-down list and buttons.
 """
 """
 TODO:
-    1. Minor and style changes
+    1. Minor changes
       a. add a header comment section explaining abbreviations used for variable
          names and function names. Make sure these are consistent in code.
-      b. 07-15-2024: after next commit, remove old code w/ "data" and "stats"
-         window objects.
+      b. refactor code for validating a data filter
+         - replace some nested ifs with small functions, starting with:
+         - can validate filter string be a function?
+         - can validate data type vs filter type be a function?
 
     2. Major changes
       a. use tkinter.font to control multiple Labels and other objects, and the 
@@ -68,10 +75,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import rf_custom_ui as custui
+import multi_select as msel
 
 styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_module()
 
-do_debug = False      # turn on debug print statements
+do_debug = False      # turn on print statements for debug
 do_profile = False    # report function signatures
 
 """ 
@@ -119,10 +127,13 @@ def chkb_extra(ev):
     print(f'   ev: {ev}')
 
 
-# def create_criterion_row(datawin: object, statwin: object) -> object:
-def create_criterion_row(windows: dict) -> object:
+def create_criterion_row_OLD(windows: dict) -> object:
     """Add a new row of widgets for defining a data filter criterion."""
-    nextrowframe = tk.Frame(filter_spec_fr, border=2, bg='cyan')
+    """
+    module variables:
+        filter_spec_fr
+    """
+    nextrowframe = ttk.Frame(filter_spec_fr, border=2)
 
     var = tk.StringVar()
     filt_cb = ttk.Combobox(nextrowframe, height=3, width=7,
@@ -137,17 +148,14 @@ def create_criterion_row(windows: dict) -> object:
     button_subt = ttk.Button(nextrowframe,
                              text='-',
                              width=1,
-                            #  command=lambda rf=nextrowframe,
-                            #                 d=windows["data"], 
-                            #                 s=windows["stats"]: remove_criterion_row(rf, d, s))
                              command=lambda rf=nextrowframe,
-                                            w=windows: remove_criterion_row(rf, w))
+                                            w=windows: msel.remove_selection_row(rf, w))
                             #  command=lambda: remove_criterion_row(nextrowframe, windows))
 
     button_add = ttk.Button(nextrowframe,
                             text='+',
                             width=1,
-                            command=lambda w=windows: add_criterion_row(w))
+                            command=lambda w=windows: msel.add_selection_row(w))
                             # command=lambda: add_criterion_row(windows))
     
     filt_cb.grid(row=0, column=0)
@@ -156,16 +164,17 @@ def create_criterion_row(windows: dict) -> object:
     button_add.grid(row=0, column=3)
 
     # what is this?
-    button_add.configure
+    # button_add.configure
 
     return nextrowframe
 
 
-# def add_criterion_row(datawin: object, statwin: object) -> None:
-def add_criterion_row(windows: dict) -> None:
+def add_criterion_row_OLD(windows: dict) -> None:
     """Add a row of widgets to define a filter criterion.
     
     The 'criteria' button must be used to filter with the new criterion.
+    module variables:
+        filt_rows
     """
     rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
     num_gridded = len(rows_gridded)
@@ -173,7 +182,7 @@ def add_criterion_row(windows: dict) -> None:
     if num_gridded == len(data_columns):
         return
 
-    newrow = create_criterion_row(windows)
+    newrow = msel.create_selection_row(windows)
     filt_rows.append(newrow)
     newrow.grid(row=num_gridded, column=0, sticky='nw')
 
@@ -192,13 +201,12 @@ def add_criterion_row(windows: dict) -> None:
         print()
 
 
-# def remove_criterion_row(rowframe: object, 
-#                          datawin: object, 
-#                          statwin: object) -> None:
-def remove_criterion_row(rowframe: object, windows: dict) -> None:
+def remove_criterion_row_OLD(rowframe: object, windows: dict) -> None:
     """Remove a row of widgets specifying a filter criterion.
     
     Data is automatically re-filtered by the remaining criteria.
+    module variables:
+        filt_rows
     """
     rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
     num_gridded = len(rows_gridded)
@@ -207,9 +215,6 @@ def remove_criterion_row(rowframe: object, windows: dict) -> None:
     if num_gridded == 1:
         return
     
-    # rem = rowframe.grid_info()
-    # print(f'rem is: {rem}')
-
     # clear filter for the row
     rowframe.winfo_children()[0].set('')
     rowframe.winfo_children()[1].delete(0, tk.END)
@@ -218,7 +223,6 @@ def remove_criterion_row(rowframe: object, windows: dict) -> None:
     filt_rows.remove(rowframe)
     
     for index, r in enumerate(filt_rows):
-        # print(f'index, r: {index}, {r}')
         r.grid_forget()
         r.grid(row=index, column=0, sticky='nw')
     
@@ -239,7 +243,6 @@ def remove_criterion_row(rowframe: object, windows: dict) -> None:
             print(f'   {r}')
         print()
 
-    # data_filter(data_1, datawin, statwin, rows_gridded)
     data_filter(data_1, windows, rows_gridded)
 
 
@@ -263,45 +266,44 @@ def clean_column_names(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     return df
 
 
-# def data_filter(data: pd.core.frame.DataFrame, 
-#                 win: object,
-#                 statwin: object,
-#                 filters: list) -> None:
 def data_filter(data: pd.core.frame.DataFrame, 
                 windows: dict,
                 filters: list) -> None:
     """Manage the construction and implementation of a dataset filter."""
     expr = make_filter(data, filters)
-    # if expr != -1:
-    if expr not in [-1, -2]:
+    print(f'in data_filter, expr is {expr}')
+    if expr not in [-1, -2, -3, -4]:
         apply_filter(data, expr, windows)
     else:
         match expr:
             case -1:
-                msg = f'Not a valid filter criterion: {expr}'
+                set_status(f'Invalid filter operator; use: =, ==, >, <, >=, <=')
             case -2:
                 data_unfilter(data, windows)
-                msg = 'No filter defined.'
+                set_status('No filter defined.')
+            case -3:
+                # e.g. 'age' + '&55', or 'age' + 'older'
+                set_status("Can\'t compare text to numeric data.")
+            case -4:
+                # e.g. 'gender' + '>55'
+                set_status("Can\'t compare number to text data.")
             case _ :
                 apply_filter(data, expr, windows)
 
 
-    # set_status('')
-
-
 def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
-    """Construct a data filter for a pandas DataFrame."""
+    """Construct a data filter for a pandas DataFrame.
+    module variables
+    """
     dcolumn = []
     criteria = []
     terms = []
     quote = ''
-    msg = None
-    err = 0      # False
+    err = 0      # False == no error
     q_expression = ''
 
     for i in range(len(filt_rows)):
         current_term = ''
-        # err = False
 
         this_filter = filt_rows[i].winfo_children()[0].get()
         this_criterion = filt_rows[i].winfo_children()[1].get()
@@ -315,99 +317,57 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
                                                  this_filter)
             the_op = validated_entry['op']
             the_value = validated_entry['value']
-            the_type = data[this_filter].dtype
+            data_type = data[this_filter].dtype
+            print(f'\ndata_type is {data_type}')
 
             if validated_entry['value'] != '':
     
                 # test for numeric value.
-                # ...float will pass
+                # ...int or float will pass
                 # if validated_entry['value'].replace('.', '', 1).isnumeric():
                 if the_value.replace('.', '', 1).isnumeric():
+                    if data_type == 'object':
+                        err = -4
                     quote = ''
                 else:
-                    # if string value
-                    if the_type == 'int64':
-                        msg = f'Cannot compare "{the_value}" to numeric data.'
-                        err = True
-
+                    # value to check is not numeric, see if data is numeric
+                    if data_type == 'int64' or data_type == 'float64':
+                        err = -3
                     quote = '\"'
                     
                 current_term = dcolumn[current_criterion] + the_op + quote + the_value + quote
             else:
-                # msg = f'Not a valid filter criterion: {this_criterion}'
+                # Not a valid filter criterion
                 err = -1
+                print(f'not valid: {this_criterion}')
 
             terms.append(current_term)
 
     if len(terms) == 0:
-        # msg = 'No filter defined.'
+        # No filter defined
         err = -2
-            
-    for t in terms:
-        q_expression += (t + ' & ')
-    q_expression = q_expression[:-3]
-
-    # if msg != None:
-    #     set_status(msg)
-
+    
     if do_debug:
         print(f'in function: {sys._getframe().f_code.co_name}')
         print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
         print(f'filt, crit: {this_filter}, {this_criterion}')
         print()
-        print(f'column {this_filter} contains type: {the_type}')
-        print(the_type in ['str', 'object', 'int64'])
+        print(f'column {this_filter} contains type: {data_type}')
+        print(data_type in ['str', 'object', 'int64'])
         print(f'q_expression string: {repr(q_expression)}')
         print()
 
-
     if err:
         print(f'make_filter, returning {err}')
+
         return err
     else:
+        print(f'make_filter, returning {q_expression}')
+        for t in terms:
+            q_expression += (t + ' & ')
+        q_expression = q_expression[:-3]
+
         return q_expression
-
-
-# def apply_filter(data: pd.core.frame.DataFrame, 
-#                  expr: str, 
-#                  win: object, 
-#                  statwin: object) -> None:
-def apply_filter(data: pd.core.frame.DataFrame, 
-                 expr: str, 
-                 windows: dict) -> None:
-    """Apply a data filter to a pandas DataFrame.
-
-    The query() function requires cleaning column names. Another method
-    is to use a series of terms like: df[col] > 55.
-    """
-    data_current = data.query(expr)
-    show_filtered(data_current, windows)
-    
-
-def show_filtered(data: pd.core.frame.DataFrame, 
-                  windows: dict) -> None:
-    """Display results of filtering a dataset."""
-    windows["data"].configure(state='normal')
-    windows["data"].delete('1.0', tk.END)
-    windows["data"].insert('1.0', data)
-    windows["data"].tag_add('redtext', '1.0', '1.end')
-    windows["data"].configure(state='disabled')
-
-    stats_agg = data.agg(stats_dict)
-    windows["stats"].configure(state='normal')
-    windows["stats"].delete('1.0', tk.END)
-    with pd.option_context('display.float_format', '{:0.2f}'.format):
-        windows["stats"].insert('1.0', stats_agg)
-
-    style_df_text(windows["stats"], stat_list)
-
-    nvalue = 'n = ' + str(data.count().iloc[0])
-    stat_n_lab.configure(text=nvalue)
-
-    data_filter_btn.configure(style='MyButton2.TButton')
-
-    if data.empty:
-        set_status('No data found.')
 
 
 def validate_criterion(input: list, data_column: int) -> dict:
@@ -461,6 +421,44 @@ def validate_criterion(input: list, data_column: int) -> dict:
     
     return criterion
     
+
+def apply_filter(data: pd.core.frame.DataFrame, 
+                 expr: str, 
+                 windows: dict) -> None:
+    """Apply a data filter to a pandas DataFrame.
+
+    The query() function requires cleaning column names. Another method
+    is to use a series of terms like: df[col] > 55.
+    """
+    data_current = data.query(expr)
+    show_filtered(data_current, windows)
+    
+
+def show_filtered(data: pd.core.frame.DataFrame, 
+                  windows: dict) -> None:
+    """Display results of filtering a dataset."""
+    windows["data"].configure(state='normal')
+    windows["data"].delete('1.0', tk.END)
+    windows["data"].insert('1.0', data)
+    windows["data"].tag_add('redtext', '1.0', '1.end')
+    windows["data"].configure(state='disabled')
+
+    stats_agg = data.agg(stats_dict)
+    windows["stats"].configure(state='normal')
+    windows["stats"].delete('1.0', tk.END)
+    with pd.option_context('display.float_format', '{:0.2f}'.format):
+        windows["stats"].insert('1.0', stats_agg)
+
+    style_df_text(windows["stats"], stat_list)
+
+    nvalue = 'n = ' + str(data.count().iloc[0])
+    stat_n_lab.configure(text=nvalue)
+
+    data_filter_btn.configure(style='MyButton2.TButton')
+
+    if data.empty:
+        set_status('No data found.')
+
 
 def data_unfilter(data: pd.core.frame.DataFrame, 
                   windows: dict) -> None:
@@ -726,14 +724,10 @@ with pd.option_context('display.float_format', '{:0.2f}'.format):
 # method 2: create a new DataFrame with formatted values.
 # Preserves stats for the whole dataset, for possible later conparison to
 # stats for a filtered dataset.
-stats_agg_format = stats_agg.map('{:0.2f}'.format)
+# stats_agg_format = stats_agg.map('{:0.2f}'.format)
 # stat_win.insert('1.0', stats_agg_format)
 
-# method 3: use the default styler object
-# TODO
-
 stat_win.tag_configure("bolded", font=('Courier New', 14, 'bold'))
-
 
 style_df_text(stat_win, stat_list)
 
@@ -759,20 +753,27 @@ filter_lab.pack(anchor='w')
 data_filter_btn = ttk.Button(filter_fr,
                         text='criteria:',
                         style='MyButton1.TButton',
-                        # command=lambda d=data_1, 
-                        #                w=data_win, 
-                        #                s=stat_win, 
-                        #                f=filt_rows: data_filter(d, w, s, f))
                         command=lambda d=data_1, 
                                        w=windows, 
                                        f=filt_rows: data_filter(d, w, f))
 
 data_filter_btn.pack(side='left', padx=5, pady=10)
 
-filter_spec_fr = tk.Frame(filter_fr, border=4, bg='yellow')
+# filter_spec_fr = tk.Frame(filter_fr, border=4, bg='yellow')
+filter_spec_fr = tk.Frame(filter_fr, border=4)
 filter_spec_fr.pack(side='left', padx=10, pady=10)
 
-rowframe = create_criterion_row(windows)
+
+# test external module
+# msel.data_1 = data_1
+# msel.data_columns = data_columns
+# msel.filter_spec_fr = filter_spec_fr
+# msel.filt_rows = filt_rows
+# msel.my_fxn = data_filter
+my_fxn = data_filter
+
+
+rowframe = msel.create_selection_row(windows)
 filter_spec_fr.grid_propagate(True)
 
 filt_rows.append(rowframe)
@@ -786,11 +787,7 @@ rowframe.grid(row=0, column=0, sticky='nw')
 
 data_unfilter_btn = ttk.Button(filter_ui,
                         text='show all data',
-                        # style='MyButton2.TButton',
                         style='MyButton3.TButton',
-                        # command=lambda d=data_1, 
-                        #                w=data_win, 
-                        #                s=stat_win: data_unfilter(d, w, s))
                         command=lambda d=data_1, 
                                        w=windows: data_unfilter(d, w))
 data_unfilter_btn.pack(side='bottom', pady=5)
@@ -866,14 +863,6 @@ category_values_ent = custui.MyEntry(scatter_setup_fr,
                                      name='categories',
                                      text=category_values)
 
-# test object placement on the UI
-# test_ent = custui.MyEntry(scatter_setup_fr, 
-#                           name='test_ent',                                    #  text=cat_val_var)
-#                           text='arbitrary')
-
-# test
-# print(f'MyEntry name attr = {category_values_ent.name}')
-
 scatter_select_fr = ttk.Frame(scatter_setup_fr)
 
 scatter_plot_btn = ttk.Button(scatter_select_fr,
@@ -935,6 +924,14 @@ label_cat_list.grid(row=1, column=1,      padx=0,         sticky='w')
 category_values_ent.grid(row=2, column=1, padx=0, pady=10, sticky='w')
 
 
+# test object placement on the UI
+# test_ent = custui.MyEntry(scatter_setup_fr, 
+#                           name='test_ent',                                    #  text=cat_val_var)
+#                           text='arbitrary')
+
+# test
+# print(f'MyEntry name attr = {category_values_ent.name}')
+
 # test_ent.grid(row=3, column=1, padx=5, pady=5, sticky='w')
 
 
@@ -952,12 +949,9 @@ y_spacing = 5
 btn_line_plot.grid(row=0, column=0, padx=5, pady=y_spacing, sticky=tk.W)
 btn_bar_plot.grid(row=1, column=0, padx=5, pady=y_spacing, sticky=tk.W)
 
-
 scatter_setup_fr.grid(row=2, column=0, columnspan=3, padx=5, pady=y_spacing,
                       ipadx=5, ipady=5)
 
-
-# scatter_plot_btn.grid(row=0, column=0, padx=5, pady=y_spacing, sticky=tk.W)
 scatter_plot_btn.grid(row=0, column=0, padx=5, sticky=tk.W)
 
 plotting_main.pack(padx=5, pady=5, fill='both')
@@ -988,7 +982,6 @@ btnq.grid(row=3, column=0, columnspan=2, padx=10, pady=10)
 # =================
 if do_profile:
     import inspect
-    # import sys
 
     all_module_fxn = [obj for name, obj in inspect.getmembers(sys.modules[__name__]) 
                         if (inspect.isfunction(obj) and
