@@ -1,8 +1,7 @@
 """
 module: rf_custom_ui.py
 
-purpose: provide widget UI and variables for a data review and
-         plotting application.
+purpose: provide custom tkinter widget classes.
 
 author: Russell Folks
 
@@ -21,6 +20,7 @@ history:
             each MyEntry instance to keep its own value.
 05-30-2024  Add docstrings to MyEntry class.
 06-09-2024  Standardize docstrings.
+08-30-2024  Add optional callback for the Combobox in FramedCombo.
 """
 """
 TODO: 
@@ -30,14 +30,9 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 
-this = sys.modules[__name__]
-# print(f'this is {this}')
-
-# this.value_list = None
-
 class MyEntry(ttk.Entry):
     """
-    MyEntry : Entry widget expecting a comma-separated list of strings.
+    MyEntry : Entry widget that expects a comma-separated list of strings.
 
     Extends: ttk.Entry
 
@@ -49,7 +44,7 @@ class MyEntry(ttk.Entry):
     Methods
     -------
     set_cat_val_list:
-        Reads the list upon cursor leaving the Entry.
+        Reads the list upon the cursor leaving the widget.
     """
     def __init__(self, parent,
                        name='',
@@ -62,7 +57,7 @@ class MyEntry(ttk.Entry):
         ----------
         name : str
             widget name attribute
-        test : str
+        text : str
             default string, or user-entered text
         """
         super().__init__(parent,
@@ -76,8 +71,6 @@ class MyEntry(ttk.Entry):
         self.value_list = []
         self.insert(0, text)
 
-        # optional (works)
-        # self.bind('<Return>', self.set_cat_val_list)
         self.bind('<Leave>', self.set_cat_val_list)
 
     def set_cat_val_list(self, ev):
@@ -110,6 +103,7 @@ class FramedCombo(ttk.Frame):
                        display_name='',
                        name='',
                        var=None,
+                       callb=None,
                        posn=None,
                        stick='w'
                  ):
@@ -122,6 +116,8 @@ class FramedCombo(ttk.Frame):
             values passed through to the Combobox.
         var : str
             variable name.
+        post : function
+            callback for the ComboboxSelected event.
         posn : list
             x and y position for packing child objects.
         display_name : str
@@ -140,6 +136,7 @@ class FramedCombo(ttk.Frame):
         
         self.cb_values = cb_values
         self.var = var
+        self.callb = callb
         self.posn = posn
         self.display_name = display_name
         self.name = name
@@ -162,15 +159,19 @@ class FramedCombo(ttk.Frame):
                           exportselection=False,
                           state='readonly',
                           name=self.name,
+                        #   validate='key',
+                        #   postcommand=self.post,
                           values=self.cb_values,
                           textvariable=self.var
                           )
+        self.cb.bind('<<ComboboxSelected>>', self.callb)
+        
         self.cb.current(0)
 
         self.lab.pack(side='left')#, fill='x')
         self.cb.pack(side='left')#, fill='x')
 
-        self.grid(row=self.posn[0], column=self.posn[1], padx=5, sticky=self.stick)
+        self.grid(row=self.posn[0], column=self.posn[1], padx=5, pady=10, sticky=self.stick)
 
     def props(self):
         """Return parameter list for the FramedCombo instance."""
