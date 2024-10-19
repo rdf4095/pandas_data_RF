@@ -46,6 +46,14 @@ history:
             This is code that was previously in this module, and will be
             removed after debug.
             multi-select = rows of frames, each with drop-down list and buttons.
+10-19-2024  Delete UI code that was moved to an external module. Add flag 
+            'use_pandas' to have UI code limit the number of filters to
+            the number of data columns.
+            Update some variable names to use UI code that is more generic.
+            Changed: filt_rows (to item_rows), filt_vars (to item_vars),
+            filter_spec_fr (to main_list_fr).
+            Import UI module using SourceFileLoader.
+            Update associated README.md file.
 """
 """
 TODO:
@@ -71,12 +79,13 @@ from importlib.machinery import SourceFileLoader
 import sys
 
 import pandas as pd
-import numpy as np
+# import numpy as np
 import matplotlib.pyplot as plt
 
 import rf_custom_ui as custui
-import multi_select as msel
+# import multi_select as msel
 
+msel = SourceFileLoader("ui_multi_select", "../ui_RF/ui_multi_select.py").load_module()
 styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_module()
 
 do_debug = False      # turn on print statements for debug
@@ -125,125 +134,6 @@ def set_use_category(varname: str) -> None:
 def chkb_extra(ev):
     print('in chkb_extra...')
     print(f'   ev: {ev}')
-
-
-def create_criterion_row_OLD(windows: dict) -> object:
-    """Add a new row of widgets for defining a data filter criterion."""
-    """
-    module variables:
-        filter_spec_fr
-    """
-    nextrowframe = ttk.Frame(filter_spec_fr, border=2)
-
-    var = tk.StringVar()
-    filt_cb = ttk.Combobox(nextrowframe, height=3, width=7,
-                           exportselection=False,
-                           state="readonly",
-                           textvariable=var,
-                           values=data_columns)
-
-    criterion = tk.StringVar()    
-    entry = ttk.Entry(nextrowframe, width=7, textvariable=criterion)
-
-    button_subt = ttk.Button(nextrowframe,
-                             text='-',
-                             width=1,
-                             command=lambda rf=nextrowframe,
-                                            w=windows: msel.remove_selection_row(rf, w))
-                            #  command=lambda: remove_criterion_row(nextrowframe, windows))
-
-    button_add = ttk.Button(nextrowframe,
-                            text='+',
-                            width=1,
-                            command=lambda w=windows: msel.add_selection_row(w))
-                            # command=lambda: add_criterion_row(windows))
-    
-    filt_cb.grid(row=0, column=0)
-    entry.grid(row=0, column=1)
-    button_subt.grid(row=0, column=2)
-    button_add.grid(row=0, column=3)
-
-    # what is this?
-    # button_add.configure
-
-    return nextrowframe
-
-
-def add_criterion_row_OLD(windows: dict) -> None:
-    """Add a row of widgets to define a filter criterion.
-    
-    The 'criteria' button must be used to filter with the new criterion.
-    module variables:
-        filt_rows
-    """
-    rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
-    num_gridded = len(rows_gridded)
-
-    if num_gridded == len(data_columns):
-        return
-
-    newrow = msel.create_selection_row(windows)
-    filt_rows.append(newrow)
-    newrow.grid(row=num_gridded, column=0, sticky='nw')
-
-    for row in rows_gridded:
-        row.winfo_children()[3].grid_remove()
-
-    if do_debug:
-        print(f'in function: {sys._getframe().f_code.co_name}')
-        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
-        print(f'adding row')
-        print(f'   {num_gridded} rows on grid:')
-        for r in rows_gridded:
-            print(f'   {r}')
-
-        print(f'   ...new row {newrow} at row: {num_gridded}')
-        print()
-
-
-def remove_criterion_row_OLD(rowframe: object, windows: dict) -> None:
-    """Remove a row of widgets specifying a filter criterion.
-    
-    Data is automatically re-filtered by the remaining criteria.
-    module variables:
-        filt_rows
-    """
-    rows_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
-    num_gridded = len(rows_gridded)
-
-    # don't remove the only row
-    if num_gridded == 1:
-        return
-    
-    # clear filter for the row
-    rowframe.winfo_children()[0].set('')
-    rowframe.winfo_children()[1].delete(0, tk.END)
-
-    rowframe.grid_forget()
-    filt_rows.remove(rowframe)
-    
-    for index, r in enumerate(filt_rows):
-        r.grid_forget()
-        r.grid(row=index, column=0, sticky='nw')
-    
-    rows_now_gridded = [r for r in filt_rows if len(r.grid_info().items()) > 0]
-    rows_now_gridded[-1].winfo_children()[3].grid(row=0, column=3, sticky='nw')
-
-    if do_debug:
-        print(f'in function: {sys._getframe().f_code.co_name}')
-        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
-        print(f'removing row (filt_rows: {len(filt_rows)})')
-        print(f'   {num_gridded} rows on grid:')
-        for r in rows_gridded:
-            print(f'   {r}')
-        print(f'   removing row {rem["row"]}')
-        num_now_gridded = len(rows_now_gridded)
-        print(f'   {num_now_gridded} rows now on grid: ')
-        for index, r in enumerate(rows_now_gridded):
-            print(f'   {r}')
-        print()
-
-    data_filter(data_1, windows, rows_gridded)
 
 
 def set_status(status_msg):
@@ -595,6 +485,9 @@ root.title = 'myocardial strain'
 
 styles_ttk.CreateStyles()
 
+# flags
+use_pandas = True
+
 category_values_ent = None
 
 data_columns = ["gender", "age", "TID", "stress EF", "rest EF"]
@@ -734,8 +627,12 @@ style_df_text(stat_win, stat_list)
 
 # Data filtering UI
 # =================
-filt_rows = []
-filt_vars = []
+# filt_rows = []
+# filt_vars = []
+
+item_rows = []
+item_vars = []
+
 criterion_vars = []
 filt_cboxes = []
 filt_entries = []
@@ -755,13 +652,12 @@ data_filter_btn = ttk.Button(filter_fr,
                         style='MyButton1.TButton',
                         command=lambda d=data_1, 
                                        w=windows, 
-                                       f=filt_rows: data_filter(d, w, f))
+                                       f=item_rows: data_filter(d, w, f))
 
 data_filter_btn.pack(side='left', padx=5, pady=10)
 
-# filter_spec_fr = tk.Frame(filter_fr, border=4, bg='yellow')
-filter_spec_fr = tk.Frame(filter_fr, border=4)
-filter_spec_fr.pack(side='left', padx=10, pady=10)
+main_list_fr = tk.Frame(filter_fr, border=4)
+main_list_fr.pack(side='left', padx=10, pady=10)
 
 
 # test external module
@@ -774,9 +670,9 @@ my_fxn = data_filter
 
 
 rowframe = msel.create_selection_row(windows)
-filter_spec_fr.grid_propagate(True)
+main_list_fr.grid_propagate(True)
 
-filt_rows.append(rowframe)
+item_rows.append(rowframe)
 
 filt_cboxes.append(rowframe.winfo_children()[0])
 filt_entries.append(rowframe.winfo_children()[1])
@@ -993,4 +889,5 @@ if do_profile:
         print(f'   signature: {sig}')
     print()
 
-root.mainloop()
+if __name__ == "__main__":
+    root.mainloop()
