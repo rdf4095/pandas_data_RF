@@ -21,6 +21,7 @@ history:
 05-30-2024  Add docstrings to MyEntry class.
 06-09-2024  Standardize docstrings.
 08-30-2024  Add optional callback for the Combobox in FramedCombo.
+10-26-2024  Update FramedCombo docstring
 """
 """
 TODO: 
@@ -64,7 +65,6 @@ class MyEntry(ttk.Entry):
                          width=10,
                          exportselection=False)
         
-        # self.name = kwargs['name']
         self.name = name
         self.textvariable = tk.StringVar()
         self.textvariable.set(text)
@@ -82,14 +82,18 @@ class MyEntry(ttk.Entry):
 
 class FramedCombo(ttk.Frame):
     """
-    FramedCombo : Defines a Frame, containing a Combobox and a Label.
+    FramedCombo : Defines a Frame, containing a Label and a Combobox.
 
     Extends: ttk.Frame
 
     Attributes
     ----------
+    sep: str
+        character appended to the Label text
     label_name: str
-        text of the Label.
+        text of the Label
+    cb: object
+        class variable for external reference to the Combobox widget
 
     Methods
     -------
@@ -114,16 +118,18 @@ class FramedCombo(ttk.Frame):
         ----------
         cb_values : list
             values passed through to the Combobox.
+        display_name : str
+            used to construct the text of the Label
+        name : str
+            name attribute of the Combobox
         var : str
             variable name.
-        post : function
+        posn : function
             callback for the ComboboxSelected event.
         posn : list
             x and y position for packing child objects.
-        display_name : str
-            used to construct the text of the Label.
-        name : str
-            name attribute of the Combobox.
+        stick : text
+            flag for widget placement in the grid
 
         Methods
         -------
@@ -143,9 +149,8 @@ class FramedCombo(ttk.Frame):
         self.stick = stick
 
         self.sep = ': '
-
-        # self.label_name = self.display_name[0].upper() + self.display_name[1:] + self.sep
         self.label_name = self.display_name.title() + self.sep
+        self.cb = None
 
         self.create_widgets()
 
