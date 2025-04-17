@@ -37,15 +37,12 @@ class MyEntry(ttk.Entry):
 
     Extends: ttk.Entry
 
-    Attributes
-    ----------
-    textvariable : tk.StringVar
-    value_list : list
+    Attributes:
+        textvariable (tk.StringVar)
+        value_list (list): text content of the Entry
 
-    Methods
-    -------
-    set_cat_val_list:
-        Reads the list upon the cursor leaving the widget.
+    Methods:
+        set_cat_val_list: read the list upon the cursor leaving the widget.
     """
     def __init__(self, parent,
                        name='',
@@ -150,9 +147,11 @@ class FramedCombo(ttk.Frame):
 
         self.sep = ': '
         self.label_name = self.display_name.title() + self.sep
+        self.lab = None
         self.cb = None
 
         self.create_widgets()
+        self.grid(row=self.posn[0], column=self.posn[1], padx=5, pady=10, sticky=self.stick)
 
     def create_widgets(self):
         self.lab = ttk.Label(self,
@@ -176,7 +175,7 @@ class FramedCombo(ttk.Frame):
         self.lab.pack(side='left')#, fill='x')
         self.cb.pack(side='left')#, fill='x')
 
-        self.grid(row=self.posn[0], column=self.posn[1], padx=5, pady=10, sticky=self.stick)
+        # self.grid(row=self.posn[0], column=self.posn[1], padx=5, pady=10, sticky=self.stick)
 
     def props(self):
         """Return parameter list for the FramedCombo instance."""

@@ -54,6 +54,8 @@ history:
             filter_spec_fr (to main_list_fr).
             Import UI module using SourceFileLoader.
             Update associated README.md file.
+04-09-2025  Use ThemedTk for the root window (cleaner widget appearance.)
+04-11-2025  Remove background show-through around main_filter_fr object.
 """
 """
 TODO:
@@ -68,22 +70,22 @@ TODO:
     2. Major changes
       a. use tkinter.font to control multiple Labels and other objects, and the 
          '+' character
-      b. import styles from my styles_ttk.py and use for all ttk widgets.
 """
 
 import tkinter as tk
 from tkinter import ttk
+# future:
 # import tkinter.font as tkfont
 from importlib.machinery import SourceFileLoader
-# to get function name and caller, for debug
+
+# only to get function name and caller, for debug:
 import sys
 
+from ttkthemes import ThemedTk
 import pandas as pd
-# import numpy as np
 import matplotlib.pyplot as plt
 
 import rf_custom_ui as custui
-# import multi_select as msel
 
 msel = SourceFileLoader("ui_multi_select", "../ui_RF/ui_multi_select.py").load_module()
 styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_module()
@@ -480,10 +482,11 @@ def scatter_plot(data: pd.DataFrame,
 
 # Module scope objects
 # ====================
-root = tk.Tk()
+# root = tk.Tk()
+root = ThemedTk()
 root.title = 'myocardial strain'
 
-styles_ttk.CreateStyles()
+styles_ttk.create_styles()
 
 # flags
 use_pandas = True
@@ -656,7 +659,12 @@ data_filter_btn = ttk.Button(filter_fr,
 
 data_filter_btn.pack(side='left', padx=5, pady=10)
 
-main_list_fr = tk.Frame(filter_fr, border=4)
+# main_list_fr = tk.Frame(filter_fr, border=4)
+# main_list_fr = ttk.Frame(filter_fr, border=4, style='test.TFrame')
+
+# border=0 prevents the background color from showing around the object
+main_list_fr = ttk.Frame(filter_fr, border=0)
+# print(f'main_list_fr background: {main_list_fr.configure()}')
 main_list_fr.pack(side='left', padx=10, pady=10)
 
 
@@ -669,7 +677,7 @@ main_list_fr.pack(side='left', padx=10, pady=10)
 my_fxn = data_filter
 
 
-rowframe = msel.create_selection_row(windows)
+rowframe = msel.create_selection_row(main_list_fr, data_columns, windows)
 main_list_fr.grid_propagate(True)
 
 item_rows.append(rowframe)
