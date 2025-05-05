@@ -56,29 +56,33 @@ history:
             Update associated README.md file.
 04-09-2025  Use ThemedTk for the root window (cleaner widget appearance.)
 04-11-2025  Remove background show-through around main_filter_fr object.
+04-24-2025  Add alpha=0.5 to scatter plot, so overlying points are more apparent.
+04-28-2025  Add a plot title, showing the flter and "n= ".
+05-02-2025  Debug scatter_plot() to handle category with filtered data. Remove
+            data parameter from plotting functions: always use data_current.
 """
 """
 TODO:
-    1. Minor changes
-      a. add a header comment section explaining abbreviations used for variable
-         names and function names. Make sure these are consistent in code.
-      b. refactor code for validating a data filter
+    1. Minor changes 
+      a. refactor code for validating a data filter
          - replace some nested ifs with small functions, starting with:
          - can validate filter string be a function?
          - can validate data type vs filter type be a function?
+      b. factor data_filter: don't need both 'if' and 'match'
 
     2. Major changes
-      a. use tkinter.font to control multiple Labels and other objects, and the 
-         '+' character
+      a. Make variable names consistent in code.
+      b. add a header comment section explaining abbreviations used for variable
+         names and function names.
+      c. use tkinter.font to control multiple Labels and other objects, and the 
+         '+' character for buttons in the filter section
 """
 
 import tkinter as tk
 from tkinter import ttk
-# future:
-# import tkinter.font as tkfont
 from importlib.machinery import SourceFileLoader
 
-# only to get function name and caller, for debug:
+# only for debug flag: to get function name and caller
 import sys
 
 from ttkthemes import ThemedTk
@@ -134,9 +138,9 @@ def set_use_category(varname: str) -> None:
 
 
 def chkb_extra(ev):
-    print('in chkb_extra...')
-    print(f'   ev: {ev}')
-
+    # print('in chkb_extra...')
+    # print(f'   ev: {ev}')
+    pass
 
 def set_status(status_msg):
     # print('in set_status...')
@@ -162,8 +166,17 @@ def data_filter(data: pd.core.frame.DataFrame,
                 windows: dict,
                 filters: list) -> None:
     """Manage the construction and implementation of a dataset filter."""
+    # global data_current
+    global filter_summary
+
     expr = make_filter(data, filters)
-    print(f'in data_filter, expr is {expr}')
+
+    # print(f'in data_filter, expr is {expr}')
+    nvalue = str(data.count().iloc[0])
+    # do more to the string?
+    expr_display = expr.replace('==', '=')# + ' (n=' + nvalue + ')'
+    filter_summary = expr_display
+
     if expr not in [-1, -2, -3, -4]:
         apply_filter(data, expr, windows)
     else:
@@ -179,8 +192,8 @@ def data_filter(data: pd.core.frame.DataFrame,
             case -4:
                 # e.g. 'gender' + '>55'
                 set_status("Can\'t compare number to text data.")
-            case _ :
-                apply_filter(data, expr, windows)
+            # case _ :
+            #     apply_filter(data, expr, windows)
 
 
 def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
@@ -250,7 +263,7 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
         print()
 
     if err:
-        print(f'make_filter, returning {err}')
+        print(f'make_filter, returning _{err}_')
 
         return err
     else:
@@ -322,6 +335,7 @@ def apply_filter(data: pd.core.frame.DataFrame,
     The query() function requires cleaning column names. Another method
     is to use a series of terms like: df[col] > 55.
     """
+    global data_current
     data_current = data.query(expr)
     show_filtered(data_current, windows)
     
@@ -355,6 +369,9 @@ def show_filtered(data: pd.core.frame.DataFrame,
 def data_unfilter(data: pd.core.frame.DataFrame, 
                   windows: dict) -> None:
     """Display the complete dataset."""
+    global data_current
+
+    data_current = data
     windows["data"].configure(state='normal')
     windows["data"].delete('1.0', tk.END)
     windows["data"].insert('1.0', data)
@@ -371,7 +388,7 @@ def data_unfilter(data: pd.core.frame.DataFrame,
 
     nvalue = 'n = ' + str(data_current.count().iloc[0])
     stat_n_lab.configure(text=nvalue)
-
+    # print(f'{nvalue=}')
     data_unfilter_btn.configure(style = 'MyButton3.TButton')
     data_filter_btn.configure(style = 'MyButton1.TButton')
 
@@ -389,7 +406,7 @@ def data_unfilter(data: pd.core.frame.DataFrame,
 def line_plot(data: pd.DataFrame,
               xcol: tk.StringVar,
               ycol: tk.StringVar) -> None:
-    """Create line plot (the default) for input data."""
+    """Create line plot (the default) for the current dataset."""
     xdata = xcol.get()
     ydata = ycol.get()
     sorted = data.sort_values(by=xdata)
@@ -410,7 +427,7 @@ def line_plot(data: pd.DataFrame,
 def bar_plot(data: pd.DataFrame,
              xcol: tk.StringVar,
              ycol: tk.StringVar) -> None:
-    """Create bar plot for input data."""
+    """Create bar plot for the current dataset."""
 
     xdata = xcol.get()
     ydata = ycol.get()
@@ -428,49 +445,71 @@ def bar_plot(data: pd.DataFrame,
         print()
 
 
-def scatter_plot(data: pd.DataFrame, 
+def create_plot(data, source, cat):
+    """Execute the scatter plot."""
+    if cat is None:
+        clr = "#00aaaa"
+    else:
+        clr = cat
+    data.plot.scatter(x=source['x'],
+                      y=source['y'],
+                      c=clr,
+                      cmap='viridis',
+                      alpha=0.5,
+                      s=40)
+
+
+def scatter_plot(data: pd.DataFrame,
                  ent: object,
                  x_variable: tk.StringVar,
                  y_variable: tk.StringVar) -> None:
-    """Create scatter plot for input data.
+    """Create scatter plot for the current dataset.
     
     Makes a copy of the DataFrame object passed in, to avoid mutating it.
     """
-    data_copy = pd.DataFrame(data)
-    plot_data = None
+    global data_current
+
+    data_copy = pd.DataFrame(data_current)
 
     source = {'x': x_variable.get(),
               'y': y_variable.get()}
 
     category = category_lb.get(category_lb.curselection())
 
-    catlist = ent.value_list
+    # a catlist value of 'auto' is a mnemonic for the user
+    # catlist = category_values_entry.get()
+    catlist = ent.get()
 
     # if the user deletes the category list or manually enters 'auto'
     if catlist in [['auto'], ['']]:
         catlist = []
+    else:
+        # must be a list
+        catlist = catlist.strip().split(',')
 
-    def create_plot(data, cat):
-        data.plot.scatter(x=source['x'],
-                          y=source['y'], 
-                          c=cat, 
-                          cmap='viridis',
-                          s=40)
-
-    if category:
-        if ((not catlist) or catlist == None or (not isinstance(catlist, list))):
+    if category != '':
+        # if not catlist: print('not catlist')
+        # if ((not catlist) or catlist == None or (not isinstance(catlist, list))):
+        if ((not catlist) or (not isinstance(catlist, list))):
             print('\nWARNING: no category list; finding category values...\n')
             data_copy[category] = data_copy[category].astype('category')
             plot_data = data_copy
         else:
-            # print('if category else...')
-            data_copy[category] = pd.Categorical(data_copy[category], categories=catlist, ordered=False)    
+            data_copy[category] = pd.Categorical(data_copy[category], categories=catlist, ordered=False)
             plot_data = data_copy[data_copy[category].isin(catlist)]
     else:
         plot_data = data_copy
         category = None
 
-    create_plot(plot_data, category)
+    print(f'plot_data:\n{plot_data}')
+    create_plot(plot_data, source, category)
+    number_of_points = str(data_current.count().iloc[0])
+
+    if filter_summary == '':
+        mytitle = 'All Data ' + ' (n = ' + number_of_points + ')'
+    else:
+        mytitle = filter_summary + ' (n = ' + number_of_points + ')'
+    plt.title(mytitle)
     plt.show()
 
 
@@ -491,7 +530,7 @@ styles_ttk.create_styles()
 # flags
 use_pandas = True
 
-category_values_ent = None
+category_values_entry = None
 
 data_columns = ["gender", "age", "TID", "stress EF", "rest EF"]
 line_data_source = 'age'
@@ -503,8 +542,6 @@ windows = {'data': None,
 
 x_text = 'x'
 y_text = 'y'
-
-data_current = None
 
 # Read the dataset
 # ================
@@ -698,6 +735,8 @@ data_unfilter_btn.pack(side='bottom', pady=5)
 
 filter_fr.pack(padx=10, pady=10, fill='both')
 
+# try: 04-22-2025
+filter_summary = ''
 
 # plotting UI
 # ===========
@@ -713,7 +752,7 @@ line_data_y = tk.StringVar()
 
 btn_line_plot = ttk.Button(plotting_main,
                 text='Line',
-                command=lambda df=data_1, x=line_data_x, y=line_data_y: line_plot(df, x, y))
+                command=lambda df=data_current, x=line_data_x, y=line_data_y: line_plot(df, x, y))
 
 line_x_fr = custui.FramedCombo(plotting_main,
                                cb_values=data_columns,
@@ -740,7 +779,7 @@ bar_data_y = tk.StringVar()
 
 btn_bar_plot = ttk.Button(plotting_main,
                text='Bar',
-               command=lambda df=data_1, x=bar_data_x, y=bar_data_y: bar_plot(df, x, y))
+               command=lambda df=data_current, x=bar_data_x, y=bar_data_y: bar_plot(df, x, y))
 
 bar_x_fr = custui.FramedCombo(plotting_main,
                               cb_values=data_columns[1:],
@@ -763,17 +802,17 @@ scatter_y = tk.StringVar()
 scatter_setup_fr = ttk.Frame(plotting_main, border=2, relief='groove')
 
 category_values = 'auto'
-category_values_ent = custui.MyEntry(scatter_setup_fr, 
-                                     name='categories',
-                                     text=category_values)
+category_values_entry = custui.MyEntry(scatter_setup_fr,
+                                       name='categories',
+                                       text=category_values)
 
 scatter_select_fr = ttk.Frame(scatter_setup_fr)
 
 scatter_plot_btn = ttk.Button(scatter_select_fr,
                    text='Scatter',
                    width=6,
-                   command=lambda df=data_1, ent=category_values_ent, x=scatter_x, y=scatter_y: scatter_plot(df, ent, x, y)
-
+                   command=lambda df=data_current, ent=category_values_entry, x=scatter_x, y=scatter_y: scatter_plot(df, ent, x, y)
+                   # command=lambda ent=category_values_entry, x=scatter_x, y=scatter_y: scatter_plot(ent, x, y)
                    )
 
 scatter_x_fr = custui.FramedCombo(scatter_select_fr,
@@ -825,7 +864,7 @@ scatter_select_fr.grid(row=0, column=0, columnspan=3, pady=10)
 use_category_chkb.grid(row=1, column=0,   padx=20,         sticky='w')
 category_lb.grid(row=2, column=0,         padx=20, pady=10, sticky='w')
 label_cat_list.grid(row=1, column=1,      padx=0,         sticky='w')
-category_values_ent.grid(row=2, column=1, padx=0, pady=10, sticky='w')
+category_values_entry.grid(row=2, column=1, padx=0, pady=10, sticky='w')
 
 
 # test object placement on the UI
