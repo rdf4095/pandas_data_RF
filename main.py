@@ -60,15 +60,16 @@ history:
 04-28-2025  Add a plot title, showing the flter and "n= ".
 05-02-2025  Debug scatter_plot() to handle category with filtered data. Remove
             data parameter from plotting functions: always use data_current.
+05-07-2025  In data_filter(), properly report filter error on the status bar.
+            For data_unfilter(), reset status bar to empty (remove any error).
+            For filter criterion, report unknown single-character operator.
+05-15-2025  Refactor make_filter() to verify the filter parameters using new:
+            functions set_criterion() and check_filter_data().
 """
 """
 TODO:
     1. Minor changes 
-      a. refactor code for validating a data filter
-         - replace some nested ifs with small functions, starting with:
-         - can validate filter string be a function?
-         - can validate data type vs filter type be a function?
-      b. factor data_filter: don't need both 'if' and 'match'
+      a. data_filter: don't need both 'if' and 'match'
 
     2. Major changes
       a. Make variable names consistent in code.
@@ -82,7 +83,7 @@ import tkinter as tk
 from tkinter import ttk
 from importlib.machinery import SourceFileLoader
 
-# only for debug flag: to get function name and caller
+# only used by the debug flag: to get function name and caller
 import sys
 
 from ttkthemes import ThemedTk
@@ -171,66 +172,73 @@ def data_filter(data: pd.core.frame.DataFrame,
 
     expr = make_filter(data, filters)
 
-    # print(f'in data_filter, expr is {expr}')
-    nvalue = str(data.count().iloc[0])
-    # do more to the string?
-    expr_display = expr.replace('==', '=')# + ' (n=' + nvalue + ')'
-    filter_summary = expr_display
+    if expr not in [-1, -2, -3, -4, -5]:
+        nvalue = str(data.count().iloc[0])
+        # do more to the string?
 
-    if expr not in [-1, -2, -3, -4]:
+        expr_display = expr.replace('==', '=')
+        filter_summary = expr_display
+        # apply_filter(data, expr, windows)
+        report_filter(expr)
         apply_filter(data, expr, windows)
     else:
-        match expr:
-            case -1:
-                set_status(f'Invalid filter operator; use: =, ==, >, <, >=, <=')
-            case -2:
-                data_unfilter(data, windows)
-                set_status('No filter defined.')
-            case -3:
-                # e.g. 'age' + '&55', or 'age' + 'older'
-                set_status("Can\'t compare text to numeric data.")
-            case -4:
-                # e.g. 'gender' + '>55'
-                set_status("Can\'t compare number to text data.")
-            # case _ :
-            #     apply_filter(data, expr, windows)
+        # match expr:
+        #     case -1:
+        #         set_status(f'Invalid filter operator; use: =, ==, >, <, >=, <=')
+        #     case -2:
+        #         data_unfilter(data, windows)
+        #         set_status('No filter defined.')
+        #     case -3:
+        #         # e.g. 'age' + '&55', or 'age' + 'older'
+        #         set_status("Can\'t compare text to numeric data.")
+        #     case -4:
+        #         # e.g. 'gender' + '>55'
+        #         set_status("Can\'t compare number to text data.")
+        #     # case _ :
+        #     #     apply_filter(data, expr, windows)
+        report_filter(expr)
+        if expr == -2:
+            data_unfilter(data, windows)
 
 
-def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
+def make_filter_orig(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
     """Construct a data filter for a pandas DataFrame.
     module variables
     """
     dcolumn = []
     criteria = []
     terms = []
-    quote = ''
-    err = 0      # False == no error
+
+    # define these in check_criterion()
+    err = 0  # False == no error
+    # quote = ''
+
     q_expression = ''
+    current_term = ''
 
     for i in range(len(filt_rows)):
-        current_term = ''
 
         this_filter = filt_rows[i].winfo_children()[0].get()
         this_criterion = filt_rows[i].winfo_children()[1].get()
-        
+
         if this_filter != '' and this_criterion != '':
+            quote = ''
             dcolumn.append(this_filter)
             criteria.append(this_criterion)
 
-            current_criterion = len(criteria) - 1
-            validated_entry = validate_criterion(criteria[current_criterion],
-                                                 this_filter)
-            the_op = validated_entry['op']
-            the_value = validated_entry['value']
-            data_type = data[this_filter].dtype
-            print(f'\ndata_type is {data_type}')
+            crit_number = len(criteria) - 1
+            valid_criterion = set_criterion(criteria[crit_number])
 
-            if validated_entry['value'] != '':
-    
+            # the_op = valid_criterion['op']
+            # the_value = valid_criterion['value']
+
+            data_type = data[this_filter].dtype
+
+            if valid_criterion['value'] != '':
                 # test for numeric value.
                 # ...int or float will pass
-                # if validated_entry['value'].replace('.', '', 1).isnumeric():
-                if the_value.replace('.', '', 1).isnumeric():
+                if valid_criterion['value'].replace('.', '', 1).isnumeric():
+                # if the_value.replace('.', '', 1).isnumeric():
                     if data_type == 'object':
                         err = -4
                     quote = ''
@@ -239,19 +247,19 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
                     if data_type == 'int64' or data_type == 'float64':
                         err = -3
                     quote = '\"'
-                    
-                current_term = dcolumn[current_criterion] + the_op + quote + the_value + quote
             else:
-                # Not a valid filter criterion
                 err = -1
-                print(f'not valid: {this_criterion}')
+                print(f'not valid criterion: {this_criterion}')
+
+            quoted_value = quote + valid_criterion['value'] + quote
+            current_term = dcolumn[crit_number] + valid_criterion['op'] + quoted_value
 
             terms.append(current_term)
 
     if len(terms) == 0:
         # No filter defined
         err = -2
-    
+
     if do_debug:
         print(f'in function: {sys._getframe().f_code.co_name}')
         print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
@@ -267,45 +275,119 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
 
         return err
     else:
-        print(f'make_filter, returning {q_expression}')
         for t in terms:
             q_expression += (t + ' & ')
         q_expression = q_expression[:-3]
+        print(f'make_filter, returning {q_expression}')
 
         return q_expression
 
 
-def validate_criterion(input: list, data_column: int) -> dict:
-    """Validate user-entered criterion for filtering data."""
-    char1 = input[0]
-    if len(input) > 1:
-        char2 = input[1]
+def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
+    """Construct a data filter for a pandas DataFrame.
+    module variables
+    """
+    dcolumn = []
+    criteria = []
+    terms = []
+
+    err = 0  # False == no error
+
+    q_expression = ''
+    current_term = ''
+
+    for i in range(len(filt_rows)):
+
+        this_filter = filt_rows[i].winfo_children()[0].get()
+        this_criterion = filt_rows[i].winfo_children()[1].get()
+        valid_criterion = ''
+
+        if this_filter == '':
+            err = -1
+
+        if this_criterion == '':
+            err += -2
+        else:
+            valid_criterion = set_criterion(this_criterion)
+
+        if err == 0:
+            # quote = ''
+            dcolumn.append(this_filter)
+            criteria.append(this_criterion)
+
+            crit_number = len(criteria) - 1
+
+            data_type = data[this_filter].dtype
+            print(f'data is {data[this_filter]}')
+
+            filter_check = check_filter_data(valid_criterion['value'], data_type)
+
+            # if filter_check['err'] == -3:
+            #     quote = '\"'
+            if filter_check['err'] == 0:
+                quote = filter_check['quote']
+                quoted_value = quote + valid_criterion['value'] + quote
+                current_term = dcolumn[crit_number] + valid_criterion['op'] + quoted_value
+
+                terms.append(current_term)
+                # print(f'{current_term=}')
+            else:
+                err = filter_check['err']
+
+    if do_debug:
+        print(f'in function: {sys._getframe().f_code.co_name}')
+        print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
+        print(f'filt, crit: {this_filter}, {this_criterion}')
+        print()
+        print(f'column {this_filter} contains type: {data_type}')
+        print(data_type in ['str', 'object', 'int64'])
+        print(f'q_expression string: {repr(q_expression)}')
+        print()
+
+    if err:
+        print(f'make_filter, returning _{err}_')
+
+        return err
     else:
-        char2 = ''
+        for t in terms:
+            q_expression += (t + ' & ')
+        q_expression = q_expression[:-3]
+        print(f'make_filter, returning {q_expression}')
+
+        return q_expression
+
+
+def set_criterion(inp: list) -> dict:
+    """Validate user-entered criterion for filtering data."""
     op = ''
     value = ''
-    msg = ''
-    
+
+    # this definition is not required...
     criterion = {'op': op,
                  'value': value}
 
+    char1 = inp[0]
+    if len(inp) > 1:
+        char2 = inp[1]
+    else:
+        char2 = ''
+
     if char1 in ['!', '=', '>', '<']:
         if char2 == '=':
-                value = input[2:]
-                op = input[0:2]
+            value = inp[2:]
+            op = inp[0:2]
         else:
-            value = input[1:]
+            value = inp[1:]
             match char1:
-                case '!': 
+                case '!':
                     op = '!='
-                case '=': 
+                case '=':
                     op = '=='
-                case _  : 
+                case _:
                     op = char1
     else:
         op = '=='
-        msg = f'setting filter to match "{input}"'
-        value = input
+        value = inp
 
     criterion['op'] = op
     criterion['value'] = value
@@ -313,21 +395,62 @@ def validate_criterion(input: list, data_column: int) -> dict:
     if do_debug:
         print(f'in function: {sys._getframe().f_code.co_name}')
         print(f'...called by: {sys._getframe().f_back.f_code.co_name}')
-        print(f'vallidate input: {input}')
+        print(f'vallidate input: {inp}')
         print()
         print(f'char1, char2: {char1}, {char2}')
         if char1 not in ['!', '=', '>', '<']:
-            print(f'setting filter criterion to: {data_column} '==' {value}')
+            print(f'setting filter criterion to: ' == ' {value}')
         print(f'validated op, value: {op}, {value}')
         print('---------')
         print()
 
-    set_status(msg)
-    
     return criterion
-    
 
-def apply_filter(data: pd.core.frame.DataFrame, 
+
+def check_filter_data(value, data_type):
+    """Check for mismatch between data type and the filter criterion."""
+    data_status = {'err': 0, 'quote': ''}
+
+    # ...int or float will pass this test
+    if value.replace('.', '', 1).isnumeric():
+        if data_type == 'object':
+            data_status['err'] = -4
+    else:
+        # value to check is not numeric, see if data is numeric
+        if data_type == 'int64' or data_type == 'float64':
+            data_status['err'] = -5
+        data_status['quote'] = '\"'
+
+    return data_status
+
+
+def report_filter(res):
+    # global filter_summary
+
+    match res:
+        case -1:
+            # set_status(f'Invalid filter operator; use: =, ==, >, <. >=. <=')
+            set_status('Data item not specicified.')
+        case -2:
+            # set_status('No filter defined.')
+            set_status('No filter criterion entered.')
+        case -3:
+            # e.g. 'age' + &55, or 'age' + 'older'
+            # set_status("Can\'t compare text to numeric data.")
+            set_status('No filter defined.')
+        case -4:
+            # e.g. 'gender' + '>55'
+            # set_status("Can\'t compare number to text data.")
+            set_status("Can\'t compare numeric filter to string data.")
+        case -5:
+            # set_status("No filter criterion entered.")
+            set_status("Can\'t compare filter string to numeric data.")
+        case _:
+            # filter_summary = expr.replace('==', '=')
+            set_status('ok')
+
+
+def apply_filter(data: pd.core.frame.DataFrame,
                  expr: str, 
                  windows: dict) -> None:
     """Apply a data filter to a pandas DataFrame.
@@ -391,6 +514,8 @@ def data_unfilter(data: pd.core.frame.DataFrame,
     # print(f'{nvalue=}')
     data_unfilter_btn.configure(style = 'MyButton3.TButton')
     data_filter_btn.configure(style = 'MyButton1.TButton')
+
+    set_status('')
 
     if do_debug:
         print(f'in function: {sys._getframe().f_code.co_name}')
@@ -470,6 +595,10 @@ def scatter_plot(data: pd.DataFrame,
     global data_current
 
     data_copy = pd.DataFrame(data_current)
+    # print(f'data_current:\n{data_current}')
+    # print(f'data_copy:\n{data_copy}')
+    # print(f'data:\n{data}')
+    # print()
 
     source = {'x': x_variable.get(),
               'y': y_variable.get()}
@@ -495,6 +624,9 @@ def scatter_plot(data: pd.DataFrame,
             data_copy[category] = data_copy[category].astype('category')
             plot_data = data_copy
         else:
+            print('...else')
+            print(f'data_copy:\n{data_copy}')
+            print(f'\n{category=}')
             data_copy[category] = pd.Categorical(data_copy[category], categories=catlist, ordered=False)
             plot_data = data_copy[data_copy[category].isin(catlist)]
     else:
