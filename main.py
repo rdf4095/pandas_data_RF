@@ -65,18 +65,18 @@ history:
             For filter criterion, report unknown single-character operator.
 05-15-2025  Refactor make_filter() to verify the filter parameters using new:
             functions set_criterion() and check_filter_data().
+06-16-2025  Use the Entry attribute value_list to get the category list.
+            Disable some print statements.
+06-20-2025  Use ListEntry instead of MyEntry for criteria list.
 """
 """
 TODO:
-    1. Minor changes 
-      a. data_filter: don't need both 'if' and 'match'
-
-    2. Major changes
-      a. Make variable names consistent in code.
+    1. Variable names
+      a. Make names consistent in code.
       b. add a header comment section explaining abbreviations used for variable
-         names and function names.
-      c. use tkinter.font to control multiple Labels and other objects, and the 
-         '+' character for buttons in the filter section
+         and function names.
+    2. Use tkinter.font to control multiple Labels and other objects.
+      a. use custom '+' character for buttons in the filter section.
 """
 
 import tkinter as tk
@@ -90,12 +90,13 @@ from ttkthemes import ThemedTk
 import pandas as pd
 import matplotlib.pyplot as plt
 
-import rf_custom_ui as custui
+# import rf_custom_ui as custui
 
-msel = SourceFileLoader("ui_multi_select", "../ui_RF/ui_multi_select.py").load_module()
+# msel = SourceFileLoader("ui_multi_select", "../ui_RF/ui_multi_select.py").load_module()
+msel = SourceFileLoader("tool_classes", "../utilities/tool_classes.py").load_module()
 styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_module()
 
-do_debug = False      # turn on print statements for debug
+do_debug = False      # print statements for debug
 do_profile = False    # report function signatures
 
 """ 
@@ -182,20 +183,6 @@ def data_filter(data: pd.core.frame.DataFrame,
         report_filter(expr)
         apply_filter(data, expr, windows)
     else:
-        # match expr:
-        #     case -1:
-        #         set_status(f'Invalid filter operator; use: =, ==, >, <, >=, <=')
-        #     case -2:
-        #         data_unfilter(data, windows)
-        #         set_status('No filter defined.')
-        #     case -3:
-        #         # e.g. 'age' + '&55', or 'age' + 'older'
-        #         set_status("Can\'t compare text to numeric data.")
-        #     case -4:
-        #         # e.g. 'gender' + '>55'
-        #         set_status("Can\'t compare number to text data.")
-        #     # case _ :
-        #     #     apply_filter(data, expr, windows)
         report_filter(expr)
         if expr == -2:
             data_unfilter(data, windows)
@@ -607,14 +594,16 @@ def scatter_plot(data: pd.DataFrame,
 
     # a catlist value of 'auto' is a mnemonic for the user
     # catlist = category_values_entry.get()
-    catlist = ent.get()
+    # catlist = ent.get()
+    catlist = ent.value_list
 
     # if the user deletes the category list or manually enters 'auto'
-    if catlist in [['auto'], ['']]:
+    if catlist in ['auto', ['']]:
         catlist = []
-    else:
+    # else:
         # must be a list
-        catlist = catlist.strip().split(',')
+        # pass
+        # catlist = catlist.strip().split(',')
 
     if category != '':
         # if not catlist: print('not catlist')
@@ -624,16 +613,16 @@ def scatter_plot(data: pd.DataFrame,
             data_copy[category] = data_copy[category].astype('category')
             plot_data = data_copy
         else:
-            print('...else')
-            print(f'data_copy:\n{data_copy}')
-            print(f'\n{category=}')
+            # print(f'{catlist=}')
+            # print(f'data_copy:\n{data_copy}')
+            # print(f'\n{category=}')
             data_copy[category] = pd.Categorical(data_copy[category], categories=catlist, ordered=False)
             plot_data = data_copy[data_copy[category].isin(catlist)]
     else:
         plot_data = data_copy
         category = None
 
-    print(f'plot_data:\n{plot_data}')
+    # print(f'plot_data:\n{plot_data}')
     create_plot(plot_data, source, category)
     number_of_points = str(data_current.count().iloc[0])
 
@@ -659,7 +648,7 @@ root.title = 'myocardial strain'
 
 styles_ttk.create_styles()
 
-# flags
+# flag for external module(s)
 use_pandas = True
 
 category_values_entry = None
@@ -836,17 +825,9 @@ main_list_fr = ttk.Frame(filter_fr, border=0)
 # print(f'main_list_fr background: {main_list_fr.configure()}')
 main_list_fr.pack(side='left', padx=10, pady=10)
 
-
-# test external module
-# msel.data_1 = data_1
-# msel.data_columns = data_columns
-# msel.filter_spec_fr = filter_spec_fr
-# msel.filt_rows = filt_rows
-# msel.my_fxn = data_filter
 my_fxn = data_filter
 
-
-rowframe = msel.create_selection_row(main_list_fr, data_columns, windows)
+rowframe = msel.init_selection_row(main_list_fr, data_columns, '', windows)
 main_list_fr.grid_propagate(True)
 
 item_rows.append(rowframe)
@@ -886,23 +867,27 @@ btn_line_plot = ttk.Button(plotting_main,
                 text='Line',
                 command=lambda df=data_current, x=line_data_x, y=line_data_y: line_plot(df, x, y))
 
-line_x_fr = custui.FramedCombo(plotting_main,
+line_x_fr = msel.ComboboxFrame(plotting_main,
                                cb_values=data_columns,
                                display_name=x_text,
                                name='line_x',
                                var=line_data_x,
-                               posn=[0,1])
+                               width=10,
+                               posn=[1,0]
+                               )
 
 # print(f'line_x_fr doc: {line_x_fr.__doc__}')
 # print()
 # print(f'props:{line_x_fr.props()}')
 
-line_y_fr = custui.FramedCombo(plotting_main,
+line_y_fr = msel.ComboboxFrame(plotting_main,
                                cb_values=data_columns[2:],
                                display_name=y_text,
                                name='line_y',
                                var=line_data_y,
-                               posn=[0,2])
+                               width=10,
+                               posn=[2,0]
+                               )
 
 # ---------- Bar plot
 # bar_data = tk.StringVar(value=data_columns[2])
@@ -913,19 +898,23 @@ btn_bar_plot = ttk.Button(plotting_main,
                text='Bar',
                command=lambda df=data_current, x=bar_data_x, y=bar_data_y: bar_plot(df, x, y))
 
-bar_x_fr = custui.FramedCombo(plotting_main,
+bar_x_fr = msel.ComboboxFrame(plotting_main,
                               cb_values=data_columns[1:],
                               display_name=x_text,
                               name='bar_x',
                               var=bar_data_x,
-                              posn=[1,1])
+                              width=10,
+                              posn=[1, 1]
+                              )
 
-bar_y_fr = custui.FramedCombo(plotting_main,
+bar_y_fr = msel.ComboboxFrame(plotting_main,
                               cb_values=data_columns[2:],
                               display_name=y_text,
                               name='bar_y',
                               var=bar_data_y,
-                              posn=[1,2])
+                              width=10,
+                              posn=[2, 1]
+                              )
 
 # ---------- Scatter plot
 scatter_x = tk.StringVar()
@@ -934,9 +923,11 @@ scatter_y = tk.StringVar()
 scatter_setup_fr = ttk.Frame(plotting_main, border=2, relief='groove')
 
 category_values = 'auto'
-category_values_entry = custui.MyEntry(scatter_setup_fr,
+category_values_entry = msel.ListEntry(scatter_setup_fr,
                                        name='categories',
-                                       text=category_values)
+                                       text=category_values
+                                       )
+
 
 scatter_select_fr = ttk.Frame(scatter_setup_fr)
 
@@ -947,19 +938,23 @@ scatter_plot_btn = ttk.Button(scatter_select_fr,
                    # command=lambda ent=category_values_entry, x=scatter_x, y=scatter_y: scatter_plot(ent, x, y)
                    )
 
-scatter_x_fr = custui.FramedCombo(scatter_select_fr,
-                               cb_values=data_columns[1:],
-                               display_name=x_text,
-                               name='scatter_x',
-                               var=scatter_x,
-                               posn=[0,1])
+scatter_x_fr = msel.ComboboxFrame(scatter_select_fr,
+                                  cb_values=data_columns[1:],
+                                  display_name=x_text,
+                                  name='scatter_x',
+                                  var=scatter_x,
+                                  width=10,
+                                  posn=[1, 0]
+                                  )
 
-scatter_y_fr = custui.FramedCombo(scatter_select_fr,
-                               cb_values=data_columns[2:],
-                               display_name=y_text,
-                               name='scatter_y',
-                               var=scatter_y,
-                               posn=[0,2])
+scatter_y_fr = msel.ComboboxFrame(scatter_select_fr,
+                                  cb_values=data_columns[2:],
+                                  display_name=y_text,
+                                  name='scatter_y',
+                                  var=scatter_y,
+                                  width=10,
+                                  posn=[2, 0]
+                                  )
 
 use_category = tk.IntVar(master=scatter_setup_fr, value = 0, name='use_category')
 use_category_chkb = ttk.Checkbutton(scatter_setup_fr,
