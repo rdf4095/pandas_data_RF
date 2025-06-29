@@ -68,6 +68,8 @@ history:
 06-16-2025  Use the Entry attribute value_list to get the category list.
             Disable some print statements.
 06-20-2025  Use ListEntry instead of MyEntry for criteria list.
+06-21-2025  Re-init err when constructing a filter from rows of MultiSelectFrames.
+06-24-2025  Update error messages for erroneous filters.
 """
 """
 TODO:
@@ -77,6 +79,8 @@ TODO:
          and function names.
     2. Use tkinter.font to control multiple Labels and other objects.
       a. use custom '+' character for buttons in the filter section.
+    3. Update README to explain how combination of valid & invalid filtes
+       are handled.
 """
 
 import tkinter as tk
@@ -90,10 +94,8 @@ from ttkthemes import ThemedTk
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# import rf_custom_ui as custui
-
 # msel = SourceFileLoader("ui_multi_select", "../ui_RF/ui_multi_select.py").load_module()
-msel = SourceFileLoader("tool_classes", "../utilities/tool_classes.py").load_module()
+msel = SourceFileLoader("msel", "../utilities/tool_classes.py").load_module()
 styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_module()
 
 do_debug = False      # print statements for debug
@@ -183,9 +185,10 @@ def data_filter(data: pd.core.frame.DataFrame,
         report_filter(expr)
         apply_filter(data, expr, windows)
     else:
+        # if expr == -2:
+        #     data_unfilter(data, windows)
+        data_unfilter(data, windows)
         report_filter(expr)
-        if expr == -2:
-            data_unfilter(data, windows)
 
 
 def make_filter_orig(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
@@ -297,6 +300,8 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
         else:
             valid_criterion = set_criterion(this_criterion)
 
+        print(f'{err=}, {valid_criterion=}')
+
         if err == 0:
             # quote = ''
             dcolumn.append(this_filter)
@@ -305,7 +310,7 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
             crit_number = len(criteria) - 1
 
             data_type = data[this_filter].dtype
-            print(f'data is {data[this_filter]}')
+            # print(f'data is {data[this_filter]}')
 
             filter_check = check_filter_data(valid_criterion['value'], data_type)
 
@@ -320,6 +325,8 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
                 # print(f'{current_term=}')
             else:
                 err = filter_check['err']
+        # print(f'    {terms=}')
+        # err = 0
 
     if do_debug:
         print(f'in function: {sys._getframe().f_code.co_name}')
@@ -331,7 +338,7 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
         print(f'q_expression string: {repr(q_expression)}')
         print()
 
-    if err:
+    if err and terms == []:
         print(f'make_filter, returning _{err}_')
 
         return err
@@ -340,6 +347,9 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
             q_expression += (t + ' & ')
         q_expression = q_expression[:-3]
         print(f'make_filter, returning {q_expression}')
+        # report nonfatal error
+        if err == -2:
+            report_filter(err)
 
         return q_expression
 
@@ -412,28 +422,22 @@ def check_filter_data(value, data_type):
 
 
 def report_filter(res):
-    # global filter_summary
-
     match res:
         case -1:
-            # set_status(f'Invalid filter operator; use: =, ==, >, <. >=. <=')
-            set_status('Data item not specicified.')
+            # in the current case, this should not happen.
+            set_status('Data item not specified.')
         case -2:
-            # set_status('No filter defined.')
-            set_status('No filter criterion entered.')
+            # valid and invalid filter rows
+            set_status('At least one invalid filter criterion.')
         case -3:
-            # e.g. 'age' + &55, or 'age' + 'older'
-            # set_status("Can\'t compare text to numeric data.")
             set_status('No filter defined.')
         case -4:
             # e.g. 'gender' + '>55'
-            # set_status("Can\'t compare number to text data.")
             set_status("Can\'t compare numeric filter to string data.")
         case -5:
-            # set_status("No filter criterion entered.")
+            # e.g. 'age' + 'older'
             set_status("Can\'t compare filter string to numeric data.")
         case _:
-            # filter_summary = expr.replace('==', '=')
             set_status('ok')
 
 
@@ -749,7 +753,7 @@ for c in data_1.columns:
 # stats_agg = data_1.agg(stats_dict)
 stats_agg = data_current.agg(stats_dict)
 
-# get the number of data rows that have a 'pt code' (i.e. are valid records):
+# get the number of rows in the data that have a 'pt code' (are valid records):
 # method 1: the chosen method, the most succinct way I can find that uses
 # a pandas function. Makes 2 assumptions, both of which are true for the
 # present use case:
@@ -790,11 +794,13 @@ style_df_text(stat_win, stat_list)
 # =================
 # filt_rows = []
 # filt_vars = []
-
-item_rows = []
+# ? don't need this
+# item_rows = []
 item_vars = []
 
 criterion_vars = []
+
+# ? don't need these:
 filt_cboxes = []
 filt_entries = []
 filt_buttons_add = []
@@ -808,36 +814,38 @@ filter_lab = ttk.Label(filter_ui, text='filter:',
                        style='BoldLabel.TLabel')
 filter_lab.pack(anchor='w')
 
-data_filter_btn = ttk.Button(filter_fr,
-                        text='criteria:',
-                        style='MyButton1.TButton',
-                        command=lambda d=data_1, 
-                                       w=windows, 
-                                       f=item_rows: data_filter(d, w, f))
-
-data_filter_btn.pack(side='left', padx=5, pady=10)
-
 # main_list_fr = tk.Frame(filter_fr, border=4)
 # main_list_fr = ttk.Frame(filter_fr, border=4, style='test.TFrame')
 
 # border=0 prevents the background color from showing around the object
 main_list_fr = ttk.Frame(filter_fr, border=0)
 # print(f'main_list_fr background: {main_list_fr.configure()}')
-main_list_fr.pack(side='left', padx=10, pady=10)
+main_list_fr.pack(side='right', padx=10, pady=10)
 
 my_fxn = data_filter
 
-rowframe = msel.init_selection_row(main_list_fr, data_columns, '', windows)
+rowframe = msel.init_selection_row(main_list_fr, data_columns, '', use_pandas, windows)
 main_list_fr.grid_propagate(True)
 
-item_rows.append(rowframe)
+# ? don't need this
+# item_rows.append(rowframe)
 
+# ? don't need these:
 filt_cboxes.append(rowframe.winfo_children()[0])
 filt_entries.append(rowframe.winfo_children()[1])
 filt_buttons_subt.append(rowframe.winfo_children()[2])
 filt_buttons_add.append(rowframe.winfo_children()[3])
 
-rowframe.grid(row=0, column=0, sticky='nw')
+# rowframe.grid(row=0, column=0, sticky='nw')
+
+data_filter_btn = ttk.Button(filter_fr,
+                        text='criteria:',
+                        style='MyButton1.TButton',
+                        command=lambda d=data_1,
+                                       w=windows,
+                                       # f=item_rows: data_filter(d, w, f))
+                                       f=rowframe.item_rows: data_filter(d, w, f))
+data_filter_btn.pack(side='left', padx=5, pady=10)
 
 data_unfilter_btn = ttk.Button(filter_ui,
                         text='show all data',
