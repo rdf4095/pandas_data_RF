@@ -10,50 +10,16 @@ comments: For Combobox and Listbox, exportselection=False is needed. Without thi
           Pyarrow will become a required dependency of pandas in the next major 
           release of pandas (pandas 3.0)
 
+          No Artificial Intelligence was used in production of this code.
+
 author: Russell Folks
 
 history:
 -------
 11-29-2023  creation
 
-...see: main_history.txt...
+...see: history.txt...
 
-06-07-2024  Add apply_filter(), needed for future programmatic filter.
-06-11-2024  Bug fix: if data query expression is empty, don't call filter.
-            Remove some comments. Reformat scatter plot UI section.
-06-15-2024  Rename some vars in the plotting section. Slightly reconfigure
-            gridding of the scatterplot objects.
-06-19-2024  Remove data_filter_ORIG() to not_used.py. Trim history.
-06-21-2024  Refine logic for validating filter criterion.
-06-25-2024  Pass filt_rows (list of frames w/ filter widgets) to data_filter().
-            In make_filter(), use var 'err' so as not to return from within
-            the body of an 'if'.
-06-27-2024  Implement status bar for user messages.
-07-02-2024  Implement do_debug flag. When set, print() variable values.
-            Bug fix: pass needed arguments to data_filter() if a rowframe
-            is deleted.
-07-04-2024  Allow filter to match a simple string w/o using the '==' operator.
-07-05-2024  Make parameter names and order consistent for filter functions,
-            and plotting functions.
-07-09-2024  Handle spurious characters in the data filter criterion. e.g. for
-            age >= 55, handle the typo 'g' in age >= g55.
-            Auto-get function name for debug print statements. See do_debug.
-            Move (almost) all prints to 'if do_debug' blocks in each fxn.
-07-15-2024  For all functions that access the two data display windows (Text
-            widgets) pass one dict of the two objects, not separate objects.
-07-21-2024  Refine data filter to handle mismatched filter and data types.
-            Initial implementation of multi-select UI as an external module.
-            This is code that was previously in this module, and will be
-            removed after debug.
-            multi-select = rows of frames, each with drop-down list and buttons.
-10-19-2024  Delete UI code that was moved to an external module. Add flag 
-            'use_pandas' to have UI code limit the number of filters to
-            the number of data columns.
-            Update some variable names to use UI code that is more generic.
-            Changed: filt_rows (to item_rows), filt_vars (to item_vars),
-            filter_spec_fr (to main_list_fr).
-            Import UI module using SourceFileLoader.
-            Update associated README.md file.
 04-09-2025  Use ThemedTk for the root window (cleaner widget appearance.)
 04-11-2025  Remove background show-through around main_filter_fr object.
 04-24-2025  Add alpha=0.5 to scatter plot, so overlying points are more apparent.
@@ -70,17 +36,17 @@ history:
 06-20-2025  Use ListEntry instead of MyEntry for criteria list.
 06-21-2025  Re-init err when constructing a filter from rows of MultiSelectFrames.
 06-24-2025  Update error messages for erroneous filters.
+08-01-2025  Update grid for some buttons: tool_classes.py expects row-first.
+            In scatter create_plot(), better handling of no category.
 """
 """
 TODO:
     1. Variable names
       a. Make names consistent in code.
-      b. add a header comment section explaining abbreviations used for variable
-         and function names.
     2. Use tkinter.font to control multiple Labels and other objects.
       a. use custom '+' character for buttons in the filter section.
-    3. Update README to explain how combination of valid & invalid filtes
-       are handled.
+    3. Update README to explain how a combination of valid & invalid filters
+       is handled.
 """
 
 import tkinter as tk
@@ -94,7 +60,6 @@ from ttkthemes import ThemedTk
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# msel = SourceFileLoader("ui_multi_select", "../ui_RF/ui_multi_select.py").load_module()
 msel = SourceFileLoader("msel", "../utilities/tool_classes.py").load_module()
 styles_ttk = SourceFileLoader("styles_ttk", "../styles/styles_ttk.py").load_module()
 
@@ -165,16 +130,24 @@ def clean_column_names(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
 
     return df
 
-
-def data_filter(data: pd.core.frame.DataFrame, 
-                windows: dict,
-                filters: list) -> None:
+# this fxn should read the number of filter rows, since the filters parameter is not updated...
+# def data_filter(data: pd.core.frame.DataFrame,
+#                 windows: dict,
+#                 filters: list) -> None:
+def data_filter(data: pd.core.frame.DataFrame,
+                windows: dict) -> None:
     """Manage the construction and implementation of a dataset filter."""
     # global data_current
     global filter_summary
 
-    expr = make_filter(data, filters)
-
+    print(f'in data_filter:')
+    # print(f'    {filters=}')
+    item_rows = msel.MultiSelectFrame.get_item_rows()
+    # print(f'    {item_rows=}')
+    # print(f'    {rowframe.item_rows=}')
+    # expr = make_filter(data, filters)
+    expr = make_filter(data, rowframe.item_rows)
+    # print(f'{expr=}')
     if expr not in [-1, -2, -3, -4, -5]:
         nvalue = str(data.count().iloc[0])
         # do more to the string?
@@ -286,6 +259,9 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
     q_expression = ''
     current_term = ''
 
+    # this class var needs to be read. Look for this in the step that calls make_filter...
+    # filt_rows = rowframe.
+
     for i in range(len(filt_rows)):
 
         this_filter = filt_rows[i].winfo_children()[0].get()
@@ -322,11 +298,8 @@ def make_filter(data: pd.core.frame.DataFrame, filt_rows: list) -> int | str:
                 current_term = dcolumn[crit_number] + valid_criterion['op'] + quoted_value
 
                 terms.append(current_term)
-                # print(f'{current_term=}')
             else:
                 err = filter_check['err']
-        # print(f'    {terms=}')
-        # err = 0
 
     if do_debug:
         print(f'in function: {sys._getframe().f_code.co_name}')
@@ -450,7 +423,9 @@ def apply_filter(data: pd.core.frame.DataFrame,
     is to use a series of terms like: df[col] > 55.
     """
     global data_current
+
     data_current = data.query(expr)
+    # print(data_current)
     show_filtered(data_current, windows)
     
 
@@ -561,16 +536,19 @@ def bar_plot(data: pd.DataFrame,
         print()
 
 
-def create_plot(data, source, cat):
+def create_plot(data: pd.DataFrame,
+                source: dict,
+                cat: str | None) -> None:
     """Execute the scatter plot."""
     if cat is None:
-        clr = "#00aaaa"
+        colormap = None
     else:
-        clr = cat
+        colormap = 'viridis'
+
     data.plot.scatter(x=source['x'],
                       y=source['y'],
-                      c=clr,
-                      cmap='viridis',
+                      c=cat,
+                      cmap=colormap,
                       alpha=0.5,
                       s=40)
 
@@ -756,7 +734,7 @@ stats_agg = data_current.agg(stats_dict)
 # get the number of rows in the data that have a 'pt code' (are valid records):
 # method 1: the chosen method, the most succinct way I can find that uses
 # a pandas function. Makes 2 assumptions, both of which are true for the
-# present use case:
+# present use case, namely that:
 #   - 'pt code' is in column 1
 #   -  all rows (records) have a 'pt code' -- no missing values.
 # print(f'items in data_current: {data_current.count().iloc[0]}')
@@ -822,9 +800,11 @@ main_list_fr = ttk.Frame(filter_fr, border=0)
 # print(f'main_list_fr background: {main_list_fr.configure()}')
 main_list_fr.pack(side='right', padx=10, pady=10)
 
-my_fxn = data_filter
+# not used
+# my_fxn = data_filter
 
 rowframe = msel.init_selection_row(main_list_fr, data_columns, '', use_pandas, windows)
+
 main_list_fr.grid_propagate(True)
 
 # ? don't need this
@@ -841,10 +821,13 @@ filt_buttons_add.append(rowframe.winfo_children()[3])
 data_filter_btn = ttk.Button(filter_fr,
                         text='criteria:',
                         style='MyButton1.TButton',
+                        # command=lambda d=data_1,
+                        #                w=windows,
+                        #                ir=msel.MultiSelectFrame.get_item_rows(): data_filter(d, w, ir)
                         command=lambda d=data_1,
-                                       w=windows,
-                                       # f=item_rows: data_filter(d, w, f))
-                                       f=rowframe.item_rows: data_filter(d, w, f))
+                                       w=windows: data_filter(d, w)
+                        )
+
 data_filter_btn.pack(side='left', padx=5, pady=10)
 
 data_unfilter_btn = ttk.Button(filter_ui,
@@ -881,7 +864,8 @@ line_x_fr = msel.ComboboxFrame(plotting_main,
                                name='line_x',
                                var=line_data_x,
                                width=10,
-                               posn=[1,0]
+                               # posn=[1,0]
+                               posn=[0,1]
                                )
 
 # print(f'line_x_fr doc: {line_x_fr.__doc__}')
@@ -894,7 +878,8 @@ line_y_fr = msel.ComboboxFrame(plotting_main,
                                name='line_y',
                                var=line_data_y,
                                width=10,
-                               posn=[2,0]
+                               # posn=[2,0]
+                               posn=[0,2]
                                )
 
 # ---------- Bar plot
@@ -921,7 +906,8 @@ bar_y_fr = msel.ComboboxFrame(plotting_main,
                               name='bar_y',
                               var=bar_data_y,
                               width=10,
-                              posn=[2, 1]
+                              # posn=[2, 1]
+                              posn=[1, 2]
                               )
 
 # ---------- Scatter plot
@@ -952,7 +938,7 @@ scatter_x_fr = msel.ComboboxFrame(scatter_select_fr,
                                   name='scatter_x',
                                   var=scatter_x,
                                   width=10,
-                                  posn=[1, 0]
+                                  posn=[0, 1]
                                   )
 
 scatter_y_fr = msel.ComboboxFrame(scatter_select_fr,
@@ -961,7 +947,7 @@ scatter_y_fr = msel.ComboboxFrame(scatter_select_fr,
                                   name='scatter_y',
                                   var=scatter_y,
                                   width=10,
-                                  posn=[2, 0]
+                                  posn=[0, 2]
                                   )
 
 use_category = tk.IntVar(master=scatter_setup_fr, value = 0, name='use_category')
@@ -992,7 +978,9 @@ category_lb.select_set(0)
 # for ind, val in enumerate(category_list):
 #     category_lb.insert(ind, val)
 
-label_cat_list = tk.Label(scatter_setup_fr, text='with category values:')
+label_cat_list = tk.Label(scatter_setup_fr, text='with category values:', background='gray93')
+# this will return "gray93" which is very close to, but not exactly, the default background color:
+# print(f'label_cat_list background is: ',label_cat_list.cget("background"))
 
 scatter_select_fr.grid(row=0, column=0, columnspan=3, pady=10)
 
@@ -1038,6 +1026,9 @@ plotting_main.pack(padx=5, pady=5, fill='both')
 # ----------
 status_fr = ttk.Frame(root, relief='groove')
 status_lab = ttk.Label(status_fr, text='status: ')
+# This will return nothing, since no background wax explicitly set.
+# print(f'status_lab cget background is: ',status_lab.cget("background"))
+# print(f'status_lab background is: ',status_lab["background"])
 
 status_txt = tk.StringVar()
 status_bar = ttk.Label(status_fr, textvariable=status_txt)
